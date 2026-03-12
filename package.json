@@ -6,21 +6,32 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:apify": "tsx scripts/test-apify.ts",
+    "test:transcribe": "tsx scripts/test-transcribe.ts",
+    "test:analyze": "tsx scripts/test-analyze.ts",
+    "test:synthesize": "tsx scripts/test-synthesize.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "apify-client": "^2.22.2",
+    "groq-sdk": "^0.37.0",
+    "next": "14.2.35",
+    "proxy-agent": "^6.5.0",
     "react": "^18",
     "react-dom": "^18",
-    "next": "14.2.35"
+    "swr": "^2.4.1"
   },
   "devDependencies": {
-    "typescript": "^5",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "dotenv": "^17.3.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.35"
+    "tsx": "^4.21.0",
+    "typescript": "^5"
   }
 }
