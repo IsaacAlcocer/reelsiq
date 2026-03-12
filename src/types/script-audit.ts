@@ -82,3 +82,26 @@ export interface ScriptAuditResult {
   crossScriptPatterns: string[];
   topRecommendation: string;
 }
+
+// ---------------------------------------------------------------------------
+// Tier 2 — Script Refiner
+// ---------------------------------------------------------------------------
+
+/** A specific change made during refinement */
+export interface ScriptChange {
+  area: "hook" | "packaging" | "retention" | "authenticity" | "cta" | "pacing" | "emotion" | "structure";
+  what: string;
+  why: string;
+}
+
+/** Result of refining a single script based on its scorecard */
+export interface RefinedScript {
+  refinedContent: string;
+  changes: ScriptChange[];
+  estimatedScoreAfter: number;
+  hookComparison: {
+    before: string;
+    after: string;
+  };
+  summaryOfChanges: string;
+}

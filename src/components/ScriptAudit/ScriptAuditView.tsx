@@ -5,8 +5,10 @@ import ScriptScorecardCard from "./ScriptScorecardCard";
 
 export default function ScriptAuditView({
   data,
+  jobId,
 }: {
   data: ScriptAuditResult;
+  jobId: string;
 }) {
   return (
     <div className="space-y-8">
@@ -75,7 +77,7 @@ export default function ScriptAuditView({
         </div>
 
         {data.scorecards?.map((scorecard, i) => (
-          <ScriptScorecardCard key={i} scorecard={scorecard} index={i} />
+          <ScriptScorecardCard key={i} scorecard={scorecard} index={i} jobId={jobId} />
         ))}
       </div>
     </div>

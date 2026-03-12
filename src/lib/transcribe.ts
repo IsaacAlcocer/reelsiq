@@ -171,7 +171,7 @@ export async function ensureTranscript(
     let whisperText: string;
     try {
       whisperText = await whisperTranscribe(audioPath);
-    } catch (err) {
+    } catch {
       // Retry once on failure (per spec Section 11)
       console.log(`[transcribe] Whisper failed, retrying once...`);
       whisperText = await whisperTranscribe(audioPath);

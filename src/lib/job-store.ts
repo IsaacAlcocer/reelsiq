@@ -4,7 +4,7 @@
 
 import type { ReelAnalysis } from "./analyze";
 import type { FormulaCard } from "./synthesize";
-import type { ScriptInput, ScriptAuditResult } from "@/types/script-audit";
+import type { ScriptInput, ScriptAuditResult, RefinedScript } from "@/types/script-audit";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,6 +50,8 @@ export interface ScriptsJobResult {
     analysis: ReelAnalysis | null;
     error: string | null;
   }>;
+  /** Tier 2: refined scripts keyed by script index */
+  refinedScripts: Record<number, RefinedScript>;
 }
 
 export type JobResult = ReelsJobResult | ScriptsJobResult;

@@ -139,6 +139,7 @@ export async function processScriptJob(job: Job): Promise<void> {
     job.result = {
       auditResult: auditResult.auditResult,
       individualAnalyses,
+      refinedScripts: {},
     };
   } catch (err) {
     job.status = "error";

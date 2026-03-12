@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import type { ScriptScorecard } from "@/types/script-audit";
+import { useState, useCallback } from "react";
+import type { ScriptScorecard, RefinedScript } from "@/types/script-audit";
 import VerdictBadge from "./VerdictBadge";
 import GradeBadge from "./GradeBadge";
+import RefinedScriptView from "./RefinedScriptView";
 
 // ---------------------------------------------------------------------------
 // Score ring (reused pattern from AlgorithmAlignment)
@@ -99,11 +100,42 @@ function AssessmentSection({
 export default function ScriptScorecardCard({
   scorecard,
   index,
+  jobId,
+  cachedRefined,
 }: {
   scorecard: ScriptScorecard;
   index: number;
+  jobId: string;
+  cachedRefined?: RefinedScript | null;
 }) {
   const [expanded, setExpanded] = useState(index === 0);
+  const [refined, setRefined] = useState<RefinedScript | null>(cachedRefined ?? null);
+  const [refining, setRefining] = useState(false);
+  const [refineError, setRefineError] = useState<string | null>(null);
+
+  const handleRefine = useCallback(async () => {
+    if (refined || refining) return;
+    setRefining(true);
+    setRefineError(null);
+
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/refine`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scriptIndex: index }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRefineError(data.error ?? "Refinement failed.");
+        return;
+      }
+      setRefined(data.refined);
+    } catch {
+      setRefineError("Network error. Please try again.");
+    } finally {
+      setRefining(false);
+    }
+  }, [jobId, index, refined, refining]);
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 overflow-hidden">
@@ -328,6 +360,48 @@ export default function ScriptScorecardCard({
               </p>
             </div>
           )}
+
+          {/* Refine button + result */}
+          <div className="border-t border-zinc-800 pt-4 mt-4">
+            {!refined && (
+              <button
+                type="button"
+                onClick={handleRefine}
+                disabled={refining}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-3.5 text-sm font-semibold text-white transition hover:from-violet-500 hover:to-violet-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {refining ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    Refining script...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Refine This Script
+                  </>
+                )}
+              </button>
+            )}
+
+            {refineError && (
+              <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
+                <p className="text-sm text-red-400">{refineError}</p>
+              </div>
+            )}
+
+            {refined && (
+              <RefinedScriptView
+                refined={refined}
+                originalScore={scorecard.overallScore}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>

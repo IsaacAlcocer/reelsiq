@@ -149,6 +149,7 @@ export default function AnalysisPage({
             <>
               <ScriptAuditView
                 data={data.result.auditResult as unknown as import("@/types/script-audit").ScriptAuditResult}
+                jobId={jobId}
               />
               {/* Individual script analyses (collapsed) */}
               {data.result.individualAnalyses && data.result.individualAnalyses.length > 0 && (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getJob } from "@/lib/job-store";
+import type { ReelsJobResult } from "@/lib/job-store";
 
 export async function POST(
   req: NextRequest,
@@ -22,15 +23,23 @@ export async function POST(
     );
   }
 
+  if (job.jobType === "scripts") {
+    return NextResponse.json(
+      { error: "Export is not yet supported for script jobs." },
+      { status: 400 }
+    );
+  }
+
+  const reelsResult = job.result as ReelsJobResult;
   const format =
     req.nextUrl.searchParams.get("format") ?? "json";
 
   if (format === "json") {
-    return NextResponse.json(job.result.formulaCard);
+    return NextResponse.json(reelsResult.formulaCard);
   }
 
   if (format === "markdown") {
-    const md = formulaCardToMarkdown(job.result.formulaCard as unknown as Record<string, unknown>);
+    const md = formulaCardToMarkdown(reelsResult.formulaCard as unknown as Record<string, unknown>);
     return new NextResponse(md, {
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
@@ -50,6 +59,7 @@ export async function POST(
 // ---------------------------------------------------------------------------
 
 function formulaCardToMarkdown(card: Record<string, unknown>): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fc = card as any;
   const c = fc.formulaCard ?? fc;
 

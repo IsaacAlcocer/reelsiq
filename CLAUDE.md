@@ -47,6 +47,16 @@ Script jobs skip scrape and transcribe entirely — the user provides scripts as
 
 Job type is distinguished by `job.jobType: "reels" | "scripts"`. The API route dispatches to either `processJob` or `processScriptJob`.
 
+### Script Refiner — Tier 2 (src/lib/refine-script.ts)
+
+After viewing their scorecard, users can click "Refine This Script" on any individual scorecard. This triggers an on-demand Sonnet call (`POST /api/jobs/[jobId]/refine` with `{ scriptIndex }`) that:
+
+1. Takes the original script + its scorecard feedback + theory prompt
+2. Rewrites the entire script addressing all identified issues
+3. Returns a `RefinedScript` with: the full rewritten script, a changelog of specific changes with growth-theory reasoning, hook before/after comparison, estimated score improvement, and a summary
+
+Refined scripts are cached on the job's `refinedScripts` map (keyed by script index) so subsequent requests for the same script return instantly. The UI shows score improvement, hook comparison, the copyable refined script, and a collapsible changes log.
+
 ### State & Polling
 
 - **Server state**: In-memory `Map` on `globalThis.__reelsiq_jobs` (survives HMR). 30-minute TTL with cleanup every 5 minutes. No database.
@@ -82,7 +92,8 @@ The FormulaCard has 13 sections, each rendered by a dedicated component in `src/
 | `src/lib/analyze-script.ts` | Per-script Haiku extraction (adapted prompt, no metadata) |
 | `src/lib/audit.ts` | Script audit Sonnet synthesis (ScriptScorecard output) |
 | `src/lib/script-processor.ts` | Script Lab pipeline orchestrator |
-| `src/types/script-audit.ts` | TypeScript interfaces for Script Lab |
+| `src/lib/refine-script.ts` | On-demand Sonnet script rewriter (Tier 2) |
+| `src/types/script-audit.ts` | TypeScript interfaces for Script Lab + Refiner |
 | `src/lib/apify.ts` | Apify actor integration |
 | `src/lib/transcribe.ts` | Transcript quality gate + Groq Whisper fallback |
 | `src/lib/rate-limit.ts` | Per-IP rate limiting (10/hr) + kill switch |
