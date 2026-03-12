@@ -8,8 +8,8 @@ export default function Home() {
           Reels<span className="text-violet-400">IQ</span>
         </h1>
         <p className="mt-2 text-sm text-zinc-400 max-w-md mx-auto">
-          Bulk Instagram Reel transcript analysis. Extract hooks, structures,
-          and strategies from top-performing content.
+          Analyze top-performing Reels or audit your own scripts against
+          Instagram&apos;s growth theory framework.
         </p>
       </div>
       <InputForm />

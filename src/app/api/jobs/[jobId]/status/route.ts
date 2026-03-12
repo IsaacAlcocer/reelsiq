@@ -17,6 +17,7 @@ export async function GET(
 
   return NextResponse.json({
     status: job.status,
+    jobType: job.jobType,
     progress: job.progress,
     result: job.result,
     ...(job.errorMessage ? { error: job.errorMessage } : {}),

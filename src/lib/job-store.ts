@@ -2,9 +2,9 @@
 // In-memory job store with 30-minute TTL — Section 8
 // ---------------------------------------------------------------------------
 
-import type { ApifyReelResult } from "./apify";
 import type { ReelAnalysis } from "./analyze";
 import type { FormulaCard } from "./synthesize";
+import type { ScriptInput, ScriptAuditResult } from "@/types/script-audit";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,9 +14,12 @@ export type JobStage =
   | "scraping"
   | "transcribing"
   | "analyzing"
+  | "auditing"
   | "synthesizing"
   | "complete"
   | "error";
+
+export type JobType = "reels" | "scripts";
 
 export interface SkipReason {
   url: string;
@@ -31,7 +34,7 @@ export interface JobProgress {
   skipReasons: SkipReason[];
 }
 
-export interface JobResult {
+export interface ReelsJobResult {
   formulaCard: FormulaCard;
   individualAnalyses: Array<{
     url: string;
@@ -40,13 +43,27 @@ export interface JobResult {
   }>;
 }
 
+export interface ScriptsJobResult {
+  auditResult: ScriptAuditResult;
+  individualAnalyses: Array<{
+    title: string;
+    analysis: ReelAnalysis | null;
+    error: string | null;
+  }>;
+}
+
+export type JobResult = ReelsJobResult | ScriptsJobResult;
+
 export interface Job {
   id: string;
   createdAt: number;
-  /** Validated & deduped URLs to process */
+  jobType: JobType;
+  /** Validated & deduped URLs to process (reels jobs) */
   urls: string[];
-  /** Validated handles to process */
+  /** Validated handles to process (reels jobs) */
   handles: string[];
+  /** User-provided scripts (script jobs) */
+  scripts: ScriptInput[];
   niche: string;
   goal: string;
   depth: "quick" | "deep";
@@ -82,24 +99,30 @@ function generateId(): string {
 }
 
 export function createJob(params: {
-  urls: string[];
-  handles: string[];
+  jobType?: JobType;
+  urls?: string[];
+  handles?: string[];
+  scripts?: ScriptInput[];
   niche: string;
   goal: string;
-  depth: "quick" | "deep";
+  depth?: "quick" | "deep";
 }): Job {
   const id = generateId();
+  const jobType = params.jobType ?? "reels";
+  const initialStage: JobStage = jobType === "scripts" ? "analyzing" : "scraping";
   const job: Job = {
     id,
     createdAt: Date.now(),
-    urls: params.urls,
-    handles: params.handles,
+    jobType,
+    urls: params.urls ?? [],
+    handles: params.handles ?? [],
+    scripts: params.scripts ?? [],
     niche: params.niche,
     goal: params.goal,
-    depth: params.depth,
-    status: "scraping",
+    depth: params.depth ?? "quick",
+    status: initialStage,
     progress: {
-      stage: "scraping",
+      stage: initialStage,
       completed: 0,
       total: 0,
       skipped: 0,

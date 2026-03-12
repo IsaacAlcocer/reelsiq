@@ -15,29 +15,36 @@ interface Progress {
   skipReasons: SkipReason[];
 }
 
-const STAGE_ORDER = ["scraping", "transcribing", "analyzing", "synthesizing", "complete"];
+const REELS_STAGE_ORDER = ["scraping", "transcribing", "analyzing", "synthesizing", "complete"];
+const SCRIPTS_STAGE_ORDER = ["analyzing", "auditing", "complete"];
+
 const STAGE_LABELS: Record<string, string> = {
   scraping: "Scraping Reels",
   transcribing: "Transcribing Audio",
   analyzing: "Analyzing Content",
+  auditing: "Auditing Scripts",
   synthesizing: "Generating Formula Card",
   complete: "Complete",
 };
-
-function stageIndex(stage: string): number {
-  const idx = STAGE_ORDER.indexOf(stage);
-  return idx === -1 ? 0 : idx;
-}
 
 export default function ProgressIndicator({
   status,
   progress,
   error,
+  jobType = "reels",
 }: {
   status: string;
   progress: Progress;
   error?: string;
+  jobType?: string;
 }) {
+  const STAGE_ORDER =
+    jobType === "scripts" ? SCRIPTS_STAGE_ORDER : REELS_STAGE_ORDER;
+
+  function stageIndex(stage: string): number {
+    const idx = STAGE_ORDER.indexOf(stage);
+    return idx === -1 ? 0 : idx;
+  }
   const [skipsOpen, setSkipsOpen] = useState(false);
 
   if (status === "error") {
@@ -59,7 +66,7 @@ export default function ProgressIndicator({
     <div className="space-y-6">
       {/* Stage steps */}
       <div className="flex items-center justify-between gap-2">
-        {STAGE_ORDER.slice(0, 4).map((stage, i) => {
+        {STAGE_ORDER.filter((s) => s !== "complete").map((stage, i) => {
           const done = currentIdx > i;
           const active = currentIdx === i && status !== "complete";
           return (

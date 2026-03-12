@@ -2,10 +2,15 @@
 // Input validation — Section 8
 // ---------------------------------------------------------------------------
 
+import type { ScriptInput } from "@/types/script-audit";
+
 const INSTAGRAM_REEL_RE =
   /^https?:\/\/(?:www\.)?instagram\.com\/(?:reel|p)\/[\w-]+\/?/i;
 
 const HANDLE_RE = /^@?[\w.]{1,30}$/;
+
+const MIN_SCRIPT_WORDS = 20;
+const MAX_SCRIPTS = 10;
 
 export interface ValidationResult {
   valid: boolean;
@@ -13,11 +18,17 @@ export interface ValidationResult {
   urls: string[];
   /** Normalised handles (if handle mode) */
   handles: string[];
+  /** Validated scripts (if script mode) */
+  scripts: ScriptInput[];
   /** Human-readable error messages */
   errors: string[];
   /** Number of duplicates removed */
   duplicatesRemoved: number;
 }
+
+// ---------------------------------------------------------------------------
+// Reels job validation (URLs + handles)
+// ---------------------------------------------------------------------------
 
 export function validateJobInput(input: {
   urls?: string[];
@@ -27,8 +38,8 @@ export function validateJobInput(input: {
   depth?: string;
 }): ValidationResult {
   const errors: string[] = [];
-  let urls: string[] = [];
-  let handles: string[] = [];
+  const urls: string[] = [];
+  const handles: string[] = [];
   let duplicatesRemoved = 0;
 
   const hasUrls = input.urls && input.urls.length > 0;
@@ -102,7 +113,68 @@ export function validateJobInput(input: {
     valid: errors.length === 0,
     urls,
     handles,
+    scripts: [],
     errors,
     duplicatesRemoved,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Script job validation
+// ---------------------------------------------------------------------------
+
+export function validateScriptInput(input: {
+  scripts?: Array<{ title?: string; content?: string }>;
+  niche?: string;
+  goal?: string;
+}): ValidationResult {
+  const errors: string[] = [];
+  const scripts: ScriptInput[] = [];
+
+  if (!input.scripts || input.scripts.length === 0) {
+    errors.push("Provide at least one script.");
+  } else {
+    if (input.scripts.length > MAX_SCRIPTS) {
+      errors.push(
+        `Maximum ${MAX_SCRIPTS} scripts allowed. You provided ${input.scripts.length}.`
+      );
+    }
+
+    for (let i = 0; i < input.scripts.length; i++) {
+      const s = input.scripts[i];
+      const content = (s.content ?? "").trim();
+      const title = (s.title ?? "").trim() || `Script ${i + 1}`;
+
+      if (!content) {
+        errors.push(`Script "${title}" is empty.`);
+        continue;
+      }
+
+      const wordCount = content.split(/\s+/).filter(Boolean).length;
+      if (wordCount < MIN_SCRIPT_WORDS) {
+        errors.push(
+          `Script "${title}" has only ${wordCount} words. Minimum ${MIN_SCRIPT_WORDS} words required for meaningful analysis.`
+        );
+        continue;
+      }
+
+      scripts.push({ title, content });
+    }
+  }
+
+  if (!input.niche || !input.niche.trim()) {
+    errors.push("Niche is required.");
+  }
+  if (!input.goal || !input.goal.trim()) {
+    errors.push("Goal is required.");
+  }
+
+  return {
+    valid: errors.length === 0,
+    urls: [],
+    handles: [],
+    scripts,
+    errors,
+    duplicatesRemoved: 0,
   };
 }

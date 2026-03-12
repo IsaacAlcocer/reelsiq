@@ -18,7 +18,10 @@ There is no unit test suite. The `test:*` scripts are integration tests that hit
 
 ## Architecture
 
-ReelsIQ is a Next.js 14 App Router application that bulk-analyzes Instagram Reels through a four-phase AI pipeline and produces a "Formula Card" — a 13-section playbook grounded in Instagram growth theory.
+ReelsIQ is a Next.js 14 App Router application with two modes:
+
+1. **Reel Analysis** — Bulk-analyzes Instagram Reels through a four-phase AI pipeline and produces a "Formula Card" (13-section playbook grounded in Instagram growth theory).
+2. **Script Lab** — Users paste their own scripts, which get audited against the growth theory framework. Produces per-script scorecards with grades, issues, and refined openings.
 
 ### Processing Pipeline (src/lib/job-processor.ts)
 
@@ -33,6 +36,16 @@ Jobs flow through four sequential phases, each with its own concurrency limit:
 4. **Synthesize** (1 call) — Claude Sonnet receives all `ReelAnalysis` objects with `THEORY_SYSTEM_PROMPT` (from `src/lib/theory-prompt.ts`) as the system message. Produces the `FormulaCard` by evaluating cross-reel patterns against the growth theory framework.
 
 Concurrency is managed by a `runWithConcurrency` helper (worker pool pattern with shared index counter in job-processor.ts). Each phase validates it has enough data to continue — if zero usable reels survive any gate, the job errors gracefully.
+
+### Script Lab Pipeline (src/lib/script-processor.ts)
+
+Script jobs skip scrape and transcribe entirely — the user provides scripts as text:
+
+1. **Analyze** (10 concurrent) — `analyze-script.ts` runs each script through Haiku with an adapted prompt (no video metadata). Produces the same 23-field `ReelAnalysis` schema.
+
+2. **Audit** (1 call) — `audit.ts` sends all analyses + original script texts to Sonnet with the theory system prompt. Produces a `ScriptAuditResult` containing per-script `ScriptScorecard`s (overall score, hook/packaging/retention/authenticity assessments, issues list, refined opening) plus cross-script patterns.
+
+Job type is distinguished by `job.jobType: "reels" | "scripts"`. The API route dispatches to either `processJob` or `processScriptJob`.
 
 ### State & Polling
 
@@ -66,6 +79,10 @@ The FormulaCard has 13 sections, each rendered by a dedicated component in `src/
 | `src/lib/synthesize.ts` | Cross-reel Sonnet synthesis (FormulaCard output) |
 | `src/lib/parse-json.ts` | 4-step JSON parsing fallback |
 | `src/lib/job-store.ts` | In-memory job store with TTL |
+| `src/lib/analyze-script.ts` | Per-script Haiku extraction (adapted prompt, no metadata) |
+| `src/lib/audit.ts` | Script audit Sonnet synthesis (ScriptScorecard output) |
+| `src/lib/script-processor.ts` | Script Lab pipeline orchestrator |
+| `src/types/script-audit.ts` | TypeScript interfaces for Script Lab |
 | `src/lib/apify.ts` | Apify actor integration |
 | `src/lib/transcribe.ts` | Transcript quality gate + Groq Whisper fallback |
 | `src/lib/rate-limit.ts` | Per-IP rate limiting (10/hr) + kill switch |
