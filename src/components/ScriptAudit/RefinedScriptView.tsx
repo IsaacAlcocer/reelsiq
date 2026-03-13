@@ -10,13 +10,12 @@ import type { RefinedScript } from "@/types/script-audit";
 function AreaBadge({ area }: { area: string }) {
   const cfg: Record<string, string> = {
     hook: "bg-violet-500/10 border-violet-500/20 text-violet-400",
-    packaging: "bg-blue-500/10 border-blue-500/20 text-blue-400",
+    structure: "bg-blue-500/10 border-blue-500/20 text-blue-400",
     retention: "bg-amber-500/10 border-amber-500/20 text-amber-400",
     authenticity: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
     cta: "bg-cyan-500/10 border-cyan-500/20 text-cyan-400",
     pacing: "bg-orange-500/10 border-orange-500/20 text-orange-400",
     emotion: "bg-pink-500/10 border-pink-500/20 text-pink-400",
-    structure: "bg-zinc-500/10 border-zinc-500/20 text-zinc-400",
   };
 
   return (

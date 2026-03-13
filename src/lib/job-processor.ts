@@ -10,6 +10,7 @@ import { scrapeReels } from "./apify";
 import { ensureTranscript } from "./transcribe";
 import { analyzeReel } from "./analyze";
 import { synthesize } from "./synthesize";
+import { saveJobResult } from "./job-persistence";
 
 // ---------------------------------------------------------------------------
 // Concurrency helper
@@ -222,6 +223,13 @@ export async function processJob(job: Job): Promise<void> {
       formulaCard: synthesisResult.formulaCard,
       individualAnalyses,
     };
+
+    // Persist to disk
+    try {
+      await saveJobResult(job);
+    } catch (persistErr) {
+      console.error("[persistence] Failed to save result:", persistErr);
+    }
   } catch (err) {
     job.status = "error";
     job.errorMessage = `Unexpected error: ${(err as Error).message}`;

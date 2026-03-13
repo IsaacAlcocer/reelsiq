@@ -204,25 +204,25 @@ export default function ScriptScorecardCard({
               </div>
             </AssessmentSection>
 
-            {/* Packaging */}
+            {/* Structure */}
             <AssessmentSection
-              title="Packaging"
+              title="Structure"
               icon={
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               }
-              grade={scorecard.packagingAssessment.grade}
-              feedback={scorecard.packagingAssessment.feedback}
+              grade={scorecard.structureAssessment.grade}
+              feedback={scorecard.structureAssessment.feedback}
             >
               <div className="space-y-1.5">
                 <p className="text-xs text-zinc-500">
                   <span className="font-medium text-zinc-400">Detected:</span>{" "}
-                  {scorecard.packagingAssessment.detectedFramework}
+                  {scorecard.structureAssessment.detectedFramework}
                 </p>
                 <p className="text-xs text-zinc-500">
-                  <span className="font-medium text-zinc-400">Recommended:</span>{" "}
-                  {scorecard.packagingAssessment.recommendedFramework}
+                  <span className="font-medium text-zinc-400">Suggestion:</span>{" "}
+                  {scorecard.structureAssessment.structuralSuggestion}
                 </p>
               </div>
             </AssessmentSection>

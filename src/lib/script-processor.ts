@@ -8,6 +8,7 @@ import type { ReelAnalysis } from "./analyze";
 import type { ScriptAnalyzeResult } from "./analyze-script";
 import { analyzeScript } from "./analyze-script";
 import { auditScripts } from "./audit";
+import { saveJobResult } from "./job-persistence";
 
 // ---------------------------------------------------------------------------
 // Concurrency helper (same pattern as job-processor.ts)
@@ -141,6 +142,13 @@ export async function processScriptJob(job: Job): Promise<void> {
       individualAnalyses,
       refinedScripts: {},
     };
+
+    // Persist to disk
+    try {
+      await saveJobResult(job);
+    } catch (persistErr) {
+      console.error("[persistence] Failed to save result:", persistErr);
+    }
   } catch (err) {
     job.status = "error";
     job.errorMessage = `Unexpected error: ${(err as Error).message}`;

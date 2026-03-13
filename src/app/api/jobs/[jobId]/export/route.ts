@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getJob } from "@/lib/job-store";
+import { getJobOrSaved } from "@/lib/job-store";
 import type { ReelsJobResult } from "@/lib/job-store";
 
 export async function POST(
@@ -7,7 +7,7 @@ export async function POST(
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params;
-  const job = getJob(jobId);
+  const job = await getJobOrSaved(jobId);
 
   if (!job) {
     return NextResponse.json(

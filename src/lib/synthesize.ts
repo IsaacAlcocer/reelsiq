@@ -407,6 +407,7 @@ async function callSonnet(client: Anthropic, userPrompt: string): Promise<string
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 8192,
+    temperature: 0,
     system: THEORY_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });

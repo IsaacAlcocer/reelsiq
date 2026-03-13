@@ -8,6 +8,8 @@ import type { ReelAnalysis } from "./analyze";
 import type { ScriptAuditResult } from "@/types/script-audit";
 import { THEORY_SYSTEM_PROMPT } from "./theory-prompt";
 import { tryParseJson } from "./parse-json";
+import { computeScore, computeVerdict } from "./scoring";
+import { extractBenchmarks, formatBenchmarksForPrompt } from "./benchmarks";
 
 // ---------------------------------------------------------------------------
 // Anthropic client (lazy singleton)
@@ -34,12 +36,17 @@ function getClient(): Anthropic {
 function buildAuditPrompt(
   analyses: Array<{ title: string; script: string; analysis: ReelAnalysis }>,
   niche: string,
-  goal: string
+  goal: string,
+  benchmarkContext: string | null
 ): string {
-  return `You are a viral content strategist auditing user-written scripts against your Instagram Growth Theory framework.
+  const benchmarkBlock = benchmarkContext
+    ? `\n${benchmarkContext}\n`
+    : "";
+
+  return `You are a content strategist auditing user-written scripts against growth principles. Your job is to help this creator find their own formula — not match a checklist.
 
 The creator writes in the ${niche} niche. Their goal is: ${goal}
-
+${benchmarkBlock}
 Below are ${analyses.length} script(s) the creator plans to use for Instagram Reels, along with their structural analyses.
 
 SCRIPTS AND ANALYSES:
@@ -52,13 +59,13 @@ STRUCTURAL ANALYSIS:
 ${JSON.stringify(a.analysis, null, 2)}
 `).join("\n")}
 
-For each script, produce a detailed SCORECARD that evaluates it against the growth theory framework. Be specific, actionable, and honest — if a script has problems, say so clearly. If it's strong, explain why.
+For each script, produce a detailed SCORECARD that evaluates it against growth principles. Be specific, actionable, and honest — if a script has problems, say so clearly. If it's strong, explain why.
 
 Pay special attention to:
 - AI-SOUNDING LANGUAGE: In the Trust Recession (2026), audiences repel anything that feels robotic or AI-generated. Flag specific phrases that sound generic, overly polished, or AI-written. This is CRITICAL.
 - HOOK EFFECTIVENESS: Apply the Two-Step Test rigorously. Does the hook pass both Instant Clarity AND Curiosity Gap?
 - PAYOFF POSITIONING: Is the answer/reveal delayed until the final third? Early payoffs kill retention.
-- PACKAGING: Is there a strong framework (comparison, contrarian gap, etc.) or is the content "raw unpackaged"?
+- STRUCTURE: Is the content organized to serve delayed payoff and sustained curiosity? Does the approach feel natural to this creator?
 
 Return ONLY valid JSON. No markdown fences, no preamble, no explanation.
 
@@ -68,8 +75,6 @@ Return ONLY valid JSON. No markdown fences, no preamble, no explanation.
   "scorecards": [
     {
       "scriptTitle": "the title of the script",
-      "overallVerdict": "ready_to_post" | "needs_refinement" | "rework_needed",
-      "overallScore": number from 0-100,
 
       "hookAssessment": {
         "grade": "strong" | "moderate" | "weak",
@@ -78,11 +83,11 @@ Return ONLY valid JSON. No markdown fences, no preamble, no explanation.
         "hookText": "the exact hook text identified"
       },
 
-      "packagingAssessment": {
+      "structureAssessment": {
         "grade": "strong" | "moderate" | "weak",
-        "feedback": "2-3 sentences on the packaging framework strength, grounded in the Packaging > Hooks principle",
-        "detectedFramework": "the packaging framework detected in this script",
-        "recommendedFramework": "the ideal packaging framework for this script's content, with a one-sentence explanation"
+        "feedback": "2-3 sentences on how the content is organized — does the structure serve curiosity and delayed payoff? Explain why the approach works or doesn't, grounded in principles",
+        "detectedFramework": "the structural approach detected in this script (e.g. comparison, layered reveal, story arc, tutorial, etc.)",
+        "structuralSuggestion": "a specific suggestion for how the script's organization could better serve payoff delay and curiosity, in terms of the content's own logic"
       },
 
       "retentionAssessment": {
@@ -112,7 +117,7 @@ Return ONLY valid JSON. No markdown fences, no preamble, no explanation.
 
       "topIssues": [
         {
-          "area": "hook" | "packaging" | "retention" | "authenticity" | "cta" | "pacing" | "emotion",
+          "area": "hook" | "structure" | "retention" | "authenticity" | "cta" | "pacing" | "emotion",
           "severity": "critical" | "moderate" | "minor",
           "issue": "concise description of the problem",
           "suggestion": "specific, actionable fix — tell the creator exactly what to change"
@@ -129,7 +134,7 @@ Return ONLY valid JSON. No markdown fences, no preamble, no explanation.
     "pattern 2",
     "pattern 3"
   ],
-  "topRecommendation": "the single most impactful change the creator should make across all their scripts, grounded in growth theory"
+  "topRecommendation": "the single most impactful change the creator should make across all their scripts, grounded in growth principles"
 }`;
 }
 
@@ -153,13 +158,24 @@ export async function auditScripts(
   }
 
   const client = getClient();
-  const userPrompt = buildAuditPrompt(analyses, niche, goal);
+
+  // Load benchmark context (optional — returns null if no saved results)
+  let benchmarkContext: string | null = null;
+  try {
+    const stats = await extractBenchmarks();
+    if (stats) benchmarkContext = formatBenchmarksForPrompt(stats);
+  } catch {
+    // Non-critical — proceed without benchmarks
+  }
+
+  const userPrompt = buildAuditPrompt(analyses, niche, goal, benchmarkContext);
 
   // First attempt
   let raw = await callSonnet(client, userPrompt);
   let parsed = tryParseJson<ScriptAuditResult>(raw);
 
   if (parsed) {
+    injectDeterministicScores(parsed);
     return { auditResult: parsed, error: null, retried: false };
   }
 
@@ -174,6 +190,7 @@ export async function auditScripts(
   parsed = tryParseJson<ScriptAuditResult>(raw);
 
   if (parsed) {
+    injectDeterministicScores(parsed);
     return { auditResult: parsed, error: null, retried: true };
   }
 
@@ -185,6 +202,24 @@ export async function auditScripts(
 }
 
 // ---------------------------------------------------------------------------
+// Post-processing: inject deterministic scores from grades
+// ---------------------------------------------------------------------------
+
+function injectDeterministicScores(result: ScriptAuditResult): void {
+  for (const card of result.scorecards) {
+    const score = computeScore({
+      hookGrade: card.hookAssessment.grade,
+      structureGrade: card.structureAssessment.grade,
+      retentionGrade: card.retentionAssessment.grade,
+      authenticityGrade: card.authenticityAssessment.grade,
+      algorithmGrade: card.algorithmAlignment.grade,
+    });
+    card.overallScore = score;
+    card.overallVerdict = computeVerdict(score);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Sonnet API call
 // ---------------------------------------------------------------------------
 
@@ -192,6 +227,7 @@ async function callSonnet(client: Anthropic, userPrompt: string): Promise<string
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 8192,
+    temperature: 0,
     system: THEORY_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });

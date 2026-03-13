@@ -149,6 +149,21 @@ export function getJob(id: string): Job | null {
   return job;
 }
 
+/**
+ * Async version that falls back to disk when the job is not in memory.
+ * Use this in API routes where you want to serve saved results.
+ */
+export async function getJobOrSaved(id: string): Promise<Job | null> {
+  // Check in-memory first
+  const memJob = getJob(id);
+  if (memJob) return memJob;
+
+  // Fallback to disk
+  const { loadSavedResult } = await import("./job-persistence");
+  const saved = await loadSavedResult(id);
+  return saved ? saved.job : null;
+}
+
 /** Periodic cleanup of expired entries (runs every 5 min) */
 setInterval(() => {
   const now = Date.now();

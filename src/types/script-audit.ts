@@ -18,7 +18,7 @@ export interface AssessmentGrade {
 export interface ScriptIssue {
   area:
     | "hook"
-    | "packaging"
+    | "structure"
     | "retention"
     | "authenticity"
     | "cta"
@@ -47,9 +47,9 @@ export interface ScriptScorecard {
     hookText: string;
   };
 
-  packagingAssessment: AssessmentGrade & {
+  structureAssessment: AssessmentGrade & {
     detectedFramework: string;
-    recommendedFramework: string;
+    structuralSuggestion: string;
   };
 
   retentionAssessment: AssessmentGrade & {
@@ -89,7 +89,7 @@ export interface ScriptAuditResult {
 
 /** A specific change made during refinement */
 export interface ScriptChange {
-  area: "hook" | "packaging" | "retention" | "authenticity" | "cta" | "pacing" | "emotion" | "structure";
+  area: "hook" | "structure" | "retention" | "authenticity" | "cta" | "pacing" | "emotion";
   what: string;
   why: string;
 }

@@ -29,6 +29,9 @@ yarn-error.log*
 .env
 .env*.local
 
+# analysis results (local data)
+/data/results/
+
 # vercel
 .vercel
 

@@ -108,16 +108,29 @@ export default function ProgressIndicator({
       {status !== "complete" && progress.total > 0 && (
         <div>
           <div className="mb-1.5 flex items-center justify-between text-xs text-zinc-400">
-            <span>
-              {progress.completed} / {progress.total} {STAGE_LABELS[progress.stage]?.toLowerCase() ?? progress.stage}
-            </span>
-            <span>{pct}%</span>
+            {progress.total === 1 && progress.completed === 0 ? (
+              <>
+                <span>{STAGE_LABELS[progress.stage] ?? progress.stage}...</span>
+                <span></span>
+              </>
+            ) : (
+              <>
+                <span>
+                  {progress.completed} / {progress.total} {STAGE_LABELS[progress.stage]?.toLowerCase() ?? progress.stage}
+                </span>
+                <span>{pct}%</span>
+              </>
+            )}
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
-            <div
-              className="h-full rounded-full bg-violet-500 transition-all duration-500"
-              style={{ width: `${pct}%` }}
-            />
+            {progress.total === 1 && progress.completed === 0 ? (
+              <div className="h-full w-1/3 rounded-full bg-violet-500 animate-pulse-slide" />
+            ) : (
+              <div
+                className="h-full rounded-full bg-violet-500 transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            )}
           </div>
         </div>
       )}

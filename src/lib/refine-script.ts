@@ -1,6 +1,8 @@
 // ---------------------------------------------------------------------------
-// Script Refiner — rewrites a script based on its audit scorecard
-// Uses Sonnet + theory prompt to produce an improved version
+// Script Refiner — enhances a script based on its audit scorecard
+// Adaptive: detects AI vs human input and applies the right strategy.
+// Convergent: high-scoring scripts get minor tweaks, not full rewrites.
+// Leans on THEORY_SYSTEM_PROMPT (system message) for all growth theory logic.
 // ---------------------------------------------------------------------------
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -27,74 +29,196 @@ function getClient(): Anthropic {
 }
 
 // ---------------------------------------------------------------------------
-// Refine prompt builder
+// Minimal voice guidance — theory system prompt handles the rest
 // ---------------------------------------------------------------------------
 
-function buildRefinePrompt(
+const VOICE_GUIDANCE = `
+VOICE PRESERVATION: The output must sound like the same creator wrote it.
+- Preserve the creator's vocabulary, sentence rhythm, tone, and energy level
+- Use their contractions, slang, and phrasing patterns — don't "clean up" their voice
+- Only flag phrases that are inconsistent with the rest of the script's own voice (e.g. a casual script with one overly formal sentence)
+- If the script sounds natural, keep it natural. If it's polished, keep it polished. Match what's already there.`;
+
+// ---------------------------------------------------------------------------
+// Shared JSON schema for all refinement modes
+// ---------------------------------------------------------------------------
+
+const JSON_SCHEMA = `
+Return ONLY valid JSON. No markdown fences, no preamble, no explanation.
+
+{
+  "refinedContent": "the enhanced script, ready to record",
+  "changes": [
+    {
+      "area": "hook" | "structure" | "retention" | "authenticity" | "cta" | "pacing" | "emotion",
+      "what": "what changed",
+      "why": "growth theory reason"
+    }
+  ],
+  "estimatedScoreAfter": number from 0-100,
+  "hookComparison": {
+    "before": "the original hook text",
+    "after": "the new hook text"
+  },
+  "summaryOfChanges": "2-3 sentences explaining what was improved and why"
+}`;
+
+// ---------------------------------------------------------------------------
+// Helper: format scorecard feedback compactly
+// ---------------------------------------------------------------------------
+
+function formatScorecard(scorecard: ScriptScorecard): string {
+  const lines = [
+    `- Hook: ${scorecard.hookAssessment.grade} — ${scorecard.hookAssessment.feedback} (Two-Step Test: ${scorecard.hookAssessment.twoStepTestVerdict})`,
+    `- Structure: ${scorecard.structureAssessment.grade} — ${scorecard.structureAssessment.feedback} (Suggestion: ${scorecard.structureAssessment.structuralSuggestion})`,
+    `- Retention: ${scorecard.retentionAssessment.grade} — ${scorecard.retentionAssessment.feedback} (Payoff: ${scorecard.retentionAssessment.payoffPosition}, Interrupts: ${scorecard.retentionAssessment.interruptDensity})`,
+    `- Authenticity: ${scorecard.authenticityAssessment.grade} — ${scorecard.authenticityAssessment.feedback}`,
+  ];
+
+  if (scorecard.authenticityAssessment.flaggedPhrases?.length > 0) {
+    lines.push(`  Flagged phrases: ${scorecard.authenticityAssessment.flaggedPhrases.map(p => `"${p}"`).join(", ")}`);
+  }
+
+  return lines.join("\n");
+}
+
+function formatIssues(scorecard: ScriptScorecard): string {
+  if (scorecard.topIssues.length === 0) return "No issues identified.";
+  return scorecard.topIssues
+    .map((issue, i) => `${i + 1}. [${issue.severity}] ${issue.area}: ${issue.issue} → ${issue.suggestion}`)
+    .join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Prompt: AI-detected script — enhance and humanize
+// ---------------------------------------------------------------------------
+
+function buildHumanizationPrompt(
   originalScript: string,
   scorecard: ScriptScorecard,
   niche: string,
   goal: string
 ): string {
-  return `You are a viral content strategist rewriting a script to fix the issues identified in its audit scorecard.
+  return `Enhance this script using your growth theory framework. The audit flagged it as AI-generated, so also make it sound natural and human.
 
-CONTEXT:
-- Niche: ${niche}
-- Creator's goal: ${goal}
-- Original score: ${scorecard.overallScore}/100
-- Verdict: ${scorecard.overallVerdict.replace(/_/g, " ")}
+CONTEXT: ${niche} niche. Goal: ${goal}. Current score: ${scorecard.overallScore}/100.
 
 ORIGINAL SCRIPT:
 ${originalScript}
 
-AUDIT SCORECARD:
-- Hook: ${scorecard.hookAssessment.grade} — ${scorecard.hookAssessment.feedback}
-  Two-Step Test: ${scorecard.hookAssessment.twoStepTestVerdict}
-  Current hook: "${scorecard.hookAssessment.hookText}"
-- Packaging: ${scorecard.packagingAssessment.grade} — ${scorecard.packagingAssessment.feedback}
-  Detected: ${scorecard.packagingAssessment.detectedFramework}
-  Recommended: ${scorecard.packagingAssessment.recommendedFramework}
-- Retention: ${scorecard.retentionAssessment.grade} — ${scorecard.retentionAssessment.feedback}
-  Payoff position: ${scorecard.retentionAssessment.payoffPosition}
-  Interrupt density: ${scorecard.retentionAssessment.interruptDensity}
-- Authenticity: ${scorecard.authenticityAssessment.grade} — ${scorecard.authenticityAssessment.feedback}
-  AI detection risk: ${scorecard.authenticityAssessment.aiDetectionRisk}
-  Flagged phrases: ${scorecard.authenticityAssessment.flaggedPhrases?.length > 0 ? scorecard.authenticityAssessment.flaggedPhrases.map(p => `"${p}"`).join(", ") : "none"}
+SCORECARD:
+${formatScorecard(scorecard)}
 
 ISSUES TO FIX:
-${scorecard.topIssues.map((issue, i) => `${i + 1}. [${issue.severity}] ${issue.area}: ${issue.issue} → ${issue.suggestion}`).join("\n")}
-
-REFINED OPENING SUGGESTION FROM AUDIT:
-"${scorecard.refinedOpening}"
+${formatIssues(scorecard)}
 
 YOUR TASK:
-Rewrite the ENTIRE script to address ALL identified issues while:
-1. MAINTAINING the creator's voice and authentic tone — do NOT make it sound more polished/corporate/AI
-2. APPLYING the recommended packaging framework (${scorecard.packagingAssessment.recommendedFramework})
-3. FIXING the hook to pass the Two-Step Test (Instant Clarity + Curiosity Gap)
-4. MOVING the payoff to the final third if it's currently too early
-5. ADDING rhetorical interrupts and tension mechanisms for better retention
-6. REMOVING or rephrasing any AI-sounding phrases — make it sound like a real human talking
-7. KEEPING approximately the same length (±20% words)
+Apply your growth theory knowledge to enhance this script. Fix the issues above while keeping ALL the original ideas and information intact. The enhanced version should be the same script but better — not a different script.
 
-Return ONLY valid JSON. No markdown fences, no preamble, no explanation.
+Key priorities:
+- Fix the hook to pass the Two-Step Test if it doesn't already
+- Improve the organizational structure to better serve payoff delay and curiosity
+- Ensure the payoff is in the final third
+- Replace AI-sounding phrases with natural language — it should sound like someone talking, not reading
+- Keep approximately the same length (±20% words)
+${VOICE_GUIDANCE}
+${JSON_SCHEMA}`;
+}
 
-{
-  "refinedContent": "the full rewritten script text, ready to record",
-  "changes": [
-    {
-      "area": "hook" | "packaging" | "retention" | "authenticity" | "cta" | "pacing" | "emotion" | "structure",
-      "what": "concise description of the specific change",
-      "why": "one sentence grounding this change in growth theory"
-    }
-  ],
-  "estimatedScoreAfter": number from 0-100 (your honest estimate of the improved score),
-  "hookComparison": {
-    "before": "the original hook text",
-    "after": "the new hook text"
-  },
-  "summaryOfChanges": "2-3 sentences explaining the overall refinement strategy and the most impactful changes made"
-}`;
+// ---------------------------------------------------------------------------
+// Prompt: Human-detected script — targeted structural improvements
+// ---------------------------------------------------------------------------
+
+function buildTargetedEditPrompt(
+  originalScript: string,
+  scorecard: ScriptScorecard,
+  niche: string,
+  goal: string
+): string {
+  return `Enhance this script using your growth theory framework. This script has authentic voice — preserve it while improving structure.
+
+CONTEXT: ${niche} niche. Goal: ${goal}. Current score: ${scorecard.overallScore}/100.
+
+ORIGINAL SCRIPT:
+${originalScript}
+
+SCORECARD:
+${formatScorecard(scorecard)}
+
+ISSUES TO FIX:
+${formatIssues(scorecard)}
+
+YOUR TASK:
+Apply your growth theory knowledge to fix the specific issues above. This script already sounds human — your job is to improve its structure and effectiveness, not rewrite it.
+
+- Keep the creator's words, tone, and style wherever possible
+- Only change what the scorecard identifies as weak
+- Fix the hook if it doesn't pass the Two-Step Test
+- Rearrange for better payoff positioning if needed
+- Keep approximately the same length (±20% words)
+${VOICE_GUIDANCE}
+${JSON_SCHEMA}`;
+}
+
+// ---------------------------------------------------------------------------
+// Prompt: Convergence mode — script scores 85+, minor tweaks only
+// ---------------------------------------------------------------------------
+
+function buildConvergencePrompt(
+  originalScript: string,
+  scorecard: ScriptScorecard,
+  niche: string,
+  goal: string
+): string {
+  return `This is a strong script (${scorecard.overallScore}/100). Make only minor tweaks — do NOT rewrite or restructure it.
+
+CONTEXT: ${niche} niche. Goal: ${goal}.
+
+ORIGINAL SCRIPT:
+${originalScript}
+
+SCORECARD:
+${formatScorecard(scorecard)}
+
+${scorecard.topIssues.length > 0 ? `MINOR ISSUES:\n${scorecard.topIssues.map((issue, i) => `${i + 1}. [${issue.severity}] ${issue.issue}`).join("\n")}` : "No significant issues found."}
+
+YOUR TASK:
+This script already works well. Make small polish-level adjustments only:
+- Sharpen a word choice or tighten a sentence
+- Strengthen the curiosity gap in the hook slightly if possible
+- Keep 90%+ of the original text unchanged
+- Do NOT restructure, change frameworks, or move the payoff
+- If it's already excellent, return it nearly as-is
+${VOICE_GUIDANCE}
+${JSON_SCHEMA}`;
+}
+
+// ---------------------------------------------------------------------------
+// Prompt selector — picks the right strategy based on score + AI detection
+// ---------------------------------------------------------------------------
+
+function selectPrompt(
+  originalScript: string,
+  scorecard: ScriptScorecard,
+  niche: string,
+  goal: string
+): string {
+  // Convergence: script is already strong — minor tweaks only
+  if (scorecard.overallScore >= 85) {
+    console.log("[refine-script] Convergence mode — score is 85+, minor tweaks only");
+    return buildConvergencePrompt(originalScript, scorecard, niche, goal);
+  }
+
+  // AI-detected: enhance + humanize
+  const aiRisk = scorecard.authenticityAssessment.aiDetectionRisk;
+  if (aiRisk === "medium" || aiRisk === "high") {
+    console.log(`[refine-script] Humanization mode — AI detection risk: ${aiRisk}`);
+    return buildHumanizationPrompt(originalScript, scorecard, niche, goal);
+  }
+
+  // Human-detected: targeted structural improvements
+  console.log("[refine-script] Targeted edit mode — script sounds human, structural fixes only");
+  return buildTargetedEditPrompt(originalScript, scorecard, niche, goal);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +238,7 @@ export async function refineScript(
   goal: string
 ): Promise<RefineResult> {
   const client = getClient();
-  const userPrompt = buildRefinePrompt(originalScript, scorecard, niche, goal);
+  const userPrompt = selectPrompt(originalScript, scorecard, niche, goal);
 
   // First attempt
   let raw = await callSonnet(client, userPrompt);
@@ -153,6 +277,7 @@ async function callSonnet(client: Anthropic, userPrompt: string): Promise<string
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 4096,
+    temperature: 0,
     system: THEORY_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
