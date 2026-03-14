@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ApifyReelResult } from "./apify";
+import type { ScrapedReel } from "./scraper";
 import type { TranscriptResult } from "./transcribe";
 import { tryParseJson } from "./parse-json";
 
@@ -130,7 +130,7 @@ function getClient(): Anthropic {
 
 function buildPrompt(
   transcript: string,
-  reel: ApifyReelResult
+  reel: ScrapedReel
 ): string {
   return `You are an expert viral content analyst specializing in short-form video.
 
@@ -208,7 +208,7 @@ export interface AnalyzeResult {
 }
 
 export async function analyzeReel(
-  reel: ApifyReelResult,
+  reel: ScrapedReel,
   transcript: TranscriptResult
 ): Promise<AnalyzeResult> {
   if (!transcript.transcript || transcript.visualOnly) {

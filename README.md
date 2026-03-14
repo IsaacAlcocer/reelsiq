@@ -31,9 +31,9 @@ ReelsIQ is not a metrics dashboard. It explains **why** content works at the scr
 ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 
 ```
-1. SCRAPING        Apify fetches video metadata and transcripts from Instagram
+1. SCRAPING        yt-dlp fetches video metadata from Instagram, GraphQL enriches with insights
          |
-2. TRANSCRIBING    Groq Whisper fills in missing/short transcripts from audio
+2. TRANSCRIBING    Groq Whisper transcribes audio extracted from reel videos
          |
 3. ANALYZING       Claude Haiku extracts 23 structured fields per reel
          |
@@ -42,9 +42,9 @@ ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 5. FORMULA CARD    A 13-section playbook: hooks, packaging, retention, voice, deployment plan
 ```
 
-**Stage 1 - Scraping:** A single Apify call (`apify/instagram-reel-scraper`) fetches all target reels in one batch. When handles are provided instead of URLs, it pulls recent reels and ranks them by view count, taking the top N based on analysis depth.
+**Stage 1 - Scraping:** yt-dlp (free, open-source) fetches reel metadata and audio URLs, then Instagram's GraphQL API enriches each reel with view counts, play counts, and follower counts. When handles are provided instead of URLs, yt-dlp lists their recent reels, scrapes each one, and ranks them by view count, taking the top N based on analysis depth. An optional Apify backend is preserved for production use (set `SCRAPER_BACKEND=apify`).
 
-**Stage 2 - Transcription:** Each reel's transcript is quality-gated. If Apify returned a usable transcript (30+ words), it's used directly. Otherwise, the video is downloaded, audio is extracted via ffmpeg, and Groq Whisper transcribes it. Reels with fewer than 20 words after all attempts are flagged as "visual-only" and skipped. Up to 5 transcriptions run concurrently.
+**Stage 2 - Transcription:** Each reel's transcript is quality-gated. If the scraper returned a usable transcript (30+ words), it's used directly. Otherwise, the audio is downloaded from the CDN URL, extracted via ffmpeg, and sent to Groq Whisper for transcription. Reels with fewer than 20 words after all attempts are flagged as "visual-only" and skipped. Up to 5 transcriptions run concurrently.
 
 **Stage 3 - Per-Reel Analysis:** Each transcript is sent to Claude Haiku 4.5 for structured extraction. The model returns a JSON object with 23 fields covering hooks, narrative structure, packaging framework, retention mechanics, vocabulary, emotion, CTAs, and transferable insights. Up to 10 analyses run concurrently.
 
@@ -62,9 +62,10 @@ ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 | Frontend | React 18 + Tailwind CSS | Dark-themed analysis UI |
 | State/Polling | SWR | Real-time job progress polling (2s interval) |
 | Storage | In-memory Map (30-min TTL) | Job state; no database required |
-| Scraping | Apify (`apify/instagram-reel-scraper`) | Instagram metadata + transcript extraction |
-| Transcription | Groq Whisper Large V3 Turbo | Audio-to-text fallback (216x real-time) |
-| Audio Processing | ffmpeg | MP4-to-MP3 conversion |
+| Scraping | yt-dlp + Instagram GraphQL | Instagram metadata, video URLs, and insights (free) |
+| Scraping (production) | Apify (`apify/instagram-reel-scraper`) | Optional paid backend for production scale |
+| Transcription | Groq Whisper Large V3 Turbo | Audio-to-text transcription (216x real-time) |
+| Audio Processing | ffmpeg | Audio extraction from video |
 | Per-Reel AI | Claude Haiku 4.5 | Structured JSON extraction from transcripts |
 | Synthesis AI | Claude Sonnet 4.5 | Theory-grounded cross-reel pattern synthesis |
 
@@ -75,8 +76,11 @@ ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 ### Prerequisites
 
 - **Node.js** 18+
+- **yt-dlp** installed and available on PATH (required for Instagram scraping)
 - **ffmpeg** installed and available on PATH (required for audio extraction)
-- API keys for Apify, Groq, and Anthropic
+- **Python** 3.x (used by yt-dlp and for cookie extraction)
+- **Firefox** with a logged-in Instagram account (for cookie-based authentication)
+- API keys for Groq and Anthropic
 
 ### Installation
 
@@ -86,12 +90,26 @@ cd reelsiq
 npm install
 ```
 
+### System Dependencies
+
+```bash
+# Verify yt-dlp
+yt-dlp --version
+
+# Verify ffmpeg
+ffmpeg -version
+
+# Install if missing:
+# macOS:   brew install yt-dlp ffmpeg
+# Windows: winget install yt-dlp.yt-dlp && winget install ffmpeg
+# Linux:   pip install yt-dlp && apt install ffmpeg
+```
+
 ### Environment Variables
 
 Create a `.env` file in the project root:
 
 ```env
-APIFY_API_TOKEN=apify_api_...         # Apify API token
 GROQ_API_KEY=gsk_...                   # Groq API key (for Whisper transcription)
 ANTHROPIC_API_KEY=sk-ant-api03-...     # Anthropic API key (for Claude)
 ```
@@ -99,16 +117,27 @@ ANTHROPIC_API_KEY=sk-ant-api03-...     # Anthropic API key (for Claude)
 Optional:
 
 ```env
+# Scraper configuration (yt-dlp is the default — no config needed)
+INSTAGRAM_COOKIES_BROWSER=firefox      # Browser to read Instagram cookies from (default: firefox)
+# INSTAGRAM_COOKIES_FILE=              # Path to Netscape cookies.txt file (overrides browser)
+# YTDLP_CONCURRENCY=3                 # Max concurrent yt-dlp calls (default: 3)
+# YTDLP_DELAY_MS=1000                 # Delay between requests in ms (default: 1000)
+
+# Production: switch to Apify for managed scraping
+# SCRAPER_BACKEND=apify               # Set to "apify" to use Apify instead of yt-dlp
+# APIFY_API_TOKEN=apify_api_...       # Required only when SCRAPER_BACKEND=apify
+
 REELSIQ_KILL_SWITCH=1                  # Set to "1" to block all new job submissions
 ```
 
-### Verify ffmpeg
+### Instagram Cookie Setup
 
-```bash
-ffmpeg -version
-```
+The yt-dlp scraper reads Instagram cookies from Firefox to authenticate with Instagram:
 
-If not installed, get it from [ffmpeg.org](https://ffmpeg.org/download.html) or via your package manager.
+1. Open Firefox and log into a **dedicated scraper Instagram account** (not your personal account)
+2. That's it — yt-dlp automatically reads the cookies from Firefox
+
+> **Tip:** Use a separate Instagram account for scraping to avoid any risk to your personal account. Keep Chrome for personal browsing, Firefox for the scraper account.
 
 ---
 
@@ -406,10 +435,10 @@ When `status` is `complete`, `result` contains:
 Four test scripts are available for validating individual pipeline stages:
 
 ```bash
-# Test Apify scraping (uses 3 default reels)
-npm run test:apify
+# Test Instagram scraping via yt-dlp + GraphQL enrichment (3 default reels)
+npm run test:scraper
 
-# Test transcript extraction (scrape + transcribe 5 reels)
+# Test transcript extraction (scrape + transcribe a reel)
 npm run test:transcribe
 
 # Test per-reel analysis (scrape + transcribe + analyze)
@@ -419,7 +448,7 @@ npm run test:analyze [url1] [url2] ...
 npm run test:synthesize [url1] [url2] ...
 ```
 
-These scripts run outside the web app and output results directly to the console. They require the same environment variables as the main application.
+These scripts run outside the web app and output results directly to the console. They require yt-dlp + ffmpeg installed, Firefox with Instagram cookies, and the API keys in `.env`.
 
 ---
 
@@ -466,7 +495,11 @@ src/
 │   ├── job-processor.ts               # Five-stage pipeline orchestrator
 │   ├── validators.ts                   # Input validation (URLs, handles, niche, goal)
 │   ├── rate-limit.ts                   # IP-based rate limiting + kill switch
-│   ├── apify.ts                        # Apify scraper integration
+│   ├── scraper/
+│   │   ├── index.ts                   # Scraper dispatcher (yt-dlp default, Apify optional)
+│   │   ├── types.ts                   # ScrapedReel interface shared by all backends
+│   │   ├── ytdlp.ts                   # Free yt-dlp + GraphQL insights backend
+│   │   └── apify.ts                   # Paid Apify backend (for production)
 │   ├── transcribe.ts                   # Transcript quality gate + Groq Whisper
 │   ├── analyze.ts                      # Per-reel Claude Haiku extraction
 │   ├── synthesize.ts                   # Cross-reel Claude Sonnet synthesis
@@ -476,7 +509,7 @@ src/
 ├── types/
 │   └── formula-card.ts                 # TypeScript interfaces for Formula Card
 scripts/
-├── test-apify.ts                       # Test Apify integration
+├── test-scraper.ts                     # Test yt-dlp + GraphQL scraping
 ├── test-transcribe.ts                  # Test transcription pipeline
 ├── test-analyze.ts                     # Test per-reel analysis
 └── test-synthesize.ts                  # Test full pipeline
@@ -489,7 +522,7 @@ docs/
 
 | Stage | Concurrency | Service |
 |-------|-------------|---------|
-| Scraping | 1 (single batch call) | Apify |
+| Scraping | 3 concurrent | yt-dlp + Instagram GraphQL |
 | Transcribing | 5 concurrent | Groq Whisper |
 | Analyzing | 10 concurrent | Claude Haiku 4.5 |
 | Synthesizing | 1 (single call) | Claude Sonnet 4.5 |
@@ -503,7 +536,7 @@ User Input (URLs/handles + niche + goal + depth)
 Job Store (in-memory, 30-min TTL)
     │
     ▼
-Job Processor ─── Stage 1: Apify ──────────────────── ApifyReelResult[]
+Job Processor ─── Stage 1: yt-dlp + GraphQL ────────── ScrapedReel[]
     │                                                        │
     │              Stage 2: Groq Whisper ◄───────────────────┘
     │                  │                              TranscriptResult[]
@@ -536,7 +569,7 @@ Job Processor ─── Stage 1: Apify ─────────────�
 }
 ```
 
-The `apify-client` package must be externalized from the Next.js server bundle for compatibility.
+The `apify-client` package is externalized from the Next.js server bundle for compatibility (only loaded when using the Apify backend).
 
 ### Rate Limiting
 
@@ -558,25 +591,27 @@ The `apify-client` package must be externalized from the Next.js server bundle f
 
 ## Cost Estimates
 
-Approximate cost per analysis run:
+Approximate cost per analysis run (using yt-dlp default backend):
 
 | Depth | Reels | Estimated Cost |
 |-------|-------|---------------|
-| Quick | ~10 | ~$0.11 |
-| Deep | ~25 | ~$0.18 |
-| Max | 30 | ~$0.19 |
+| Quick | ~10 | ~$0.08 |
+| Deep | ~25 | ~$0.15 |
+| Max | 30 | ~$0.17 |
 
 Cost breakdown by service:
-- **Apify**: ~$0.0026 per reel scraped
-- **Groq Whisper**: ~$0.04 per hour of audio (only used when Apify transcript is insufficient)
+- **yt-dlp + GraphQL**: Free (default scraping backend)
+- **Groq Whisper**: ~$0.04 per hour of audio (free tier available)
 - **Claude Haiku 4.5**: Low cost per reel analysis
 - **Claude Sonnet 4.5**: Single synthesis call per job
+- **Apify** (optional production backend): ~$0.0026 per reel scraped
 
 ---
 
 ## Deployment Notes
 
-- **ffmpeg is required** on the server. Serverless platforms like Vercel Edge do not include it — use a serverful environment (e.g., Vercel Functions with Node.js runtime, Railway, Fly.io, or a VPS).
+- **yt-dlp and ffmpeg are required** on the server. Serverless platforms like Vercel Edge do not include them — use a serverful environment (e.g., Railway, Fly.io, or a VPS).
+- **Firefox with Instagram cookies** is required on the scraping machine for the yt-dlp backend. For production, switch to `SCRAPER_BACKEND=apify` which handles authentication via managed account pools.
 - **No database required** — jobs are stored in-memory. For production scale, swap the job store for Redis or a database.
-- **Apify actor timeout** is set to 300 seconds (5 minutes).
 - Environment variables must be available at runtime (not just build time).
+- Keep yt-dlp updated (`yt-dlp -U`) as Instagram frequently changes their frontend.

@@ -3,10 +3,10 @@
 // ---------------------------------------------------------------------------
 
 import type { Job, SkipReason } from "./job-store";
-import type { ApifyReelResult } from "./apify";
+import type { ScrapedReel } from "./scraper";
 import type { TranscriptResult } from "./transcribe";
 import type { ReelAnalysis, AnalyzeResult } from "./analyze";
-import { scrapeReels } from "./apify";
+import { scrapeReels } from "./scraper";
 import { ensureTranscript } from "./transcribe";
 import { analyzeReel } from "./analyze";
 import { synthesize } from "./synthesize";
@@ -42,7 +42,7 @@ async function runWithConcurrency<T>(
 export async function processJob(job: Job): Promise<void> {
   try {
     // ------------------------------------------------------------------
-    // 1. SCRAPE PHASE — single Apify batch call
+    // 1. SCRAPE PHASE — yt-dlp scraping (or Apify if configured)
     // ------------------------------------------------------------------
     job.status = "scraping";
     job.progress.stage = "scraping";
@@ -53,7 +53,7 @@ export async function processJob(job: Job): Promise<void> {
     ];
     job.progress.total = allInputs.length;
 
-    let reels: ApifyReelResult[];
+    let reels: ScrapedReel[];
     try {
       reels = await scrapeReels(allInputs);
     } catch (err) {
@@ -110,7 +110,7 @@ export async function processJob(job: Job): Promise<void> {
 
     // Filter out visual-only / failed transcriptions
     const analyzable: Array<{
-      reel: ApifyReelResult;
+      reel: ScrapedReel;
       transcript: TranscriptResult;
     }> = [];
 

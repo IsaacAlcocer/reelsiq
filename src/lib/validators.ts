@@ -69,7 +69,7 @@ export function validateJobInput(input: {
         continue;
       }
       seen.add(normalised);
-      // Keep original casing for the actual URL sent to Apify
+      // Keep original casing for the actual URL sent to scraper
       urls.push(trimmed.replace(/\/+$/, ""));
     }
 

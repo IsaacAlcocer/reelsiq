@@ -2,18 +2,17 @@
  * Test script for the Groq Whisper fallback transcription pipeline.
  *
  * Tests with a reel that has no captions to exercise the full pipeline:
- *   Apify scrape -> transcript quality gate -> ffmpeg -> Groq Whisper
+ *   Scrape -> transcript quality gate -> ffmpeg -> Groq Whisper
  *
  * Usage:
  *   npx tsx scripts/test-transcribe.ts
  *   npx tsx scripts/test-transcribe.ts https://www.instagram.com/reel/YOUR_URL/
  *
- * Requires APIFY_API_TOKEN and GROQ_API_KEY in .env
- * Requires ffmpeg installed and available on PATH
+ * Requires GROQ_API_KEY in .env, yt-dlp + ffmpeg installed
  */
 
 import "dotenv/config";
-import { scrapeReels } from "../src/lib/apify";
+import { scrapeReels } from "../src/lib/scraper";
 import { ensureTranscript } from "../src/lib/transcribe";
 
 // Default test URL — a reel likely to have no/short captions.
@@ -27,13 +26,13 @@ async function main() {
   console.log(`Test URL: ${testUrl}\n`);
 
   // Step 1: Scrape the reel with Apify
-  console.log("--- Step 1: Scraping with Apify ---");
+  console.log("--- Step 1: Scraping ---");
   const startScrape = Date.now();
   const reels = await scrapeReels([testUrl]);
   const scrapeTime = ((Date.now() - startScrape) / 1000).toFixed(1);
 
   if (reels.length === 0) {
-    console.error("No results from Apify. The URL may be invalid or private.");
+    console.error("No results from scraper. The URL may be invalid or private.");
     process.exit(1);
   }
 
@@ -44,7 +43,7 @@ async function main() {
   console.log(`  Duration:     ${reel.durationSeconds ?? "N/A"}s`);
   console.log(`  Video URL:    ${reel.videoUrl ? "present" : "MISSING"}`);
   console.log(
-    `  Apify transcript: ${reel.transcriptWordCount} words (usable: ${reel.hasUsableTranscript})`
+    `  Scraped transcript: ${reel.transcriptWordCount} words (usable: ${reel.hasUsableTranscript})`
   );
   if (reel.transcript) {
     console.log(
@@ -78,9 +77,9 @@ async function main() {
   console.log();
 
   // Interpretation
-  if (result.source === "apify") {
+  if (result.source === "scraper") {
     console.log(
-      "Result: Apify transcript was sufficient (>= 30 words). Whisper was NOT needed."
+      "Result: Scraped transcript was sufficient (>= 30 words). Whisper was NOT needed."
     );
     console.log(
       "To test the Whisper fallback, try a reel with no spoken captions."
