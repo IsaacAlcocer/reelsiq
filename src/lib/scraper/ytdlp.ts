@@ -243,6 +243,23 @@ const GRAPHQL_DOC_ID = "8845758582119845"; // PostPage query
 const IG_APP_ID = "936619743392459";
 
 /**
+ * Standard headers for Instagram API requests.
+ * Instagram requires Sec-Fetch-* headers — without them, requests get 400.
+ */
+function igHeaders(cookies: { cookieString: string; csrfToken: string }): Record<string, string> {
+  return {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    Cookie: cookies.cookieString,
+    "X-CSRFToken": cookies.csrfToken,
+    "X-IG-App-ID": IG_APP_ID,
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
+  };
+}
+
+/**
  * Extract shortcode from an Instagram URL.
  * Handles /reel/CODE/, /p/CODE/, /reels/CODE/
  */
@@ -351,11 +368,7 @@ async function fetchReelInsights(
     const res = await fetch("https://www.instagram.com/graphql/query/", {
       method: "POST",
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        Cookie: cookies.cookieString,
-        "X-CSRFToken": cookies.csrfToken,
-        "X-IG-App-ID": IG_APP_ID,
+        ...igHeaders(cookies),
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body,
@@ -453,49 +466,151 @@ async function scrapeReel(url: string): Promise<ScrapedReel | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Scrape a profile's reels (handle input)
+// Scrape a profile's reels (handle input) — via Instagram API
+// yt-dlp's profile extractor is broken, so we use Instagram's feed/user
+// endpoint which returns reels with full metadata (views, likes, etc.)
 // ---------------------------------------------------------------------------
 
-async function scrapeProfile(handle: string): Promise<string[]> {
-  const profileUrl = `https://www.instagram.com/${handle}/reels/`;
-  const args = [
-    "--flat-playlist",
-    "--dump-json",
-    "--no-warnings",
-    ...getCookieArgs(),
-    profileUrl,
-  ];
+interface ProfileReel {
+  url: string;
+  viewCount: number | null;
+  likeCount: number | null;
+  commentCount: number | null;
+  caption: string | null;
+  durationSeconds: number | null;
+  shortcode: string;
+}
 
-  console.log(`[yt-dlp] Listing reels for @${handle}...`);
-
+/**
+ * Get a user's Instagram ID from their username.
+ */
+async function getUserId(
+  handle: string,
+  cookies: { cookieString: string; csrfToken: string }
+): Promise<string | null> {
   try {
-    const stdout = await ytdlp(args, 120_000); // 2 min timeout for profiles
-    const urls: string[] = [];
-
-    // yt-dlp outputs one JSON object per line in flat-playlist mode
-    for (const line of stdout.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const entry = JSON.parse(trimmed) as Record<string, unknown>;
-        const entryUrl =
-          (entry.webpage_url as string) ??
-          (entry.url as string) ??
-          (entry.original_url as string);
-        if (entryUrl) urls.push(entryUrl);
-      } catch {
-        // skip unparseable lines
+    const res = await fetch(
+      `https://www.instagram.com/api/v1/users/web_profile_info/?username=${handle}`,
+      {
+        headers: {
+          ...igHeaders(cookies),
+        },
       }
+    );
+    if (!res.ok) {
+      console.error(`[graphql] web_profile_info failed for @${handle}: HTTP ${res.status}`);
+      return null;
     }
-
-    console.log(`[yt-dlp] Found ${urls.length} reel(s) for @${handle}`);
-    return urls;
+    const data = (await res.json()) as Record<string, unknown>;
+    const dataObj = data.data as Record<string, unknown> | undefined;
+    const user = dataObj?.user as Record<string, unknown> | undefined;
+    if (!user) {
+      console.error(`[graphql] No user data in response for @${handle}`);
+      return null;
+    }
+    return (user.id as string) ?? null;
   } catch (err) {
+    console.error(`[graphql] getUserId error for @${handle}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/**
+ * Fetch a user's recent reels via Instagram's feed/user API.
+ * Returns reel URLs with basic metadata for sorting by views.
+ */
+async function scrapeProfile(handle: string): Promise<ProfileReel[]> {
+  const cookies = getCachedCookies();
+  if (!cookies) {
     console.error(
-      `[yt-dlp] Failed to list reels for @${handle}: ${(err as Error).message}`
+      `[graphql] Cannot list reels for @${handle} — Firefox cookies unavailable`
     );
     return [];
   }
+
+  console.log(`[graphql] Looking up user ID for @${handle}...`);
+  const userId = await getUserId(handle, cookies);
+  if (!userId) {
+    console.error(
+      `[graphql] Could not find user @${handle} — check the handle is correct`
+    );
+    return [];
+  }
+
+  console.log(`[graphql] Fetching reels for @${handle} (ID: ${userId})...`);
+
+  const reels: ProfileReel[] = [];
+  let maxId: string | null = null;
+  let pages = 0;
+  const maxPages = 3; // Up to ~36 reels (12 per page)
+
+  while (pages < maxPages) {
+    try {
+      let feedUrl = `https://www.instagram.com/api/v1/feed/user/${userId}/?count=12`;
+      if (maxId) feedUrl += `&max_id=${maxId}`;
+
+      const res = await fetch(feedUrl, {
+        headers: igHeaders(cookies),
+      });
+
+      if (!res.ok) {
+        console.error(
+          `[graphql] Feed request failed for @${handle}: HTTP ${res.status}`
+        );
+        break;
+      }
+
+      const data = (await res.json()) as Record<string, unknown>;
+      const items = data.items as Array<Record<string, unknown>> | undefined;
+      if (!items || items.length === 0) break;
+
+      for (const item of items) {
+        const mediaType = item.media_type as number;
+        // media_type 2 = video/reel, skip photos (1) and carousels (8)
+        if (mediaType !== 2) continue;
+
+        const code = item.code as string;
+        const captionObj = item.caption as Record<string, unknown> | null;
+
+        reels.push({
+          url: `https://www.instagram.com/p/${code}/`,
+          viewCount:
+            (item.play_count as number) ??
+            (item.view_count as number) ??
+            null,
+          likeCount: (item.like_count as number) ?? null,
+          commentCount: (item.comment_count as number) ?? null,
+          caption: captionObj
+            ? (captionObj.text as string) ?? null
+            : null,
+          durationSeconds:
+            item.video_duration != null
+              ? Math.round(item.video_duration as number)
+              : null,
+          shortcode: code,
+        });
+      }
+
+      const moreAvailable = data.more_available as boolean;
+      maxId = data.next_max_id as string | null;
+      pages++;
+
+      if (!moreAvailable || !maxId) break;
+
+      // Small delay between pagination requests
+      await sleep(500);
+    } catch (err) {
+      console.error(
+        `[graphql] Error fetching page ${pages + 1} for @${handle}: ${(err as Error).message}`
+      );
+      break;
+    }
+  }
+
+  console.log(
+    `[graphql] Found ${reels.length} reel(s) for @${handle} across ${pages} page(s)`
+  );
+  return reels;
 }
 
 // ---------------------------------------------------------------------------
@@ -520,10 +635,18 @@ export async function scrapeReelsYtdlp(
     }
   }
 
-  // Scrape profiles to get reel URLs
+  // Scrape profiles to get reel URLs (via Instagram API, not yt-dlp)
+  // Profile reels already come with views/likes/comments from the feed API
+  const profileReelData: Map<string, ProfileReel> = new Map();
+
   for (const handle of handles) {
     const profileReels = await scrapeProfile(handle);
-    reelUrls.push(...profileReels);
+    for (const pr of profileReels) {
+      if (!reelUrls.includes(pr.url)) {
+        reelUrls.push(pr.url);
+        profileReelData.set(pr.url, pr);
+      }
+    }
     if (handles.indexOf(handle) < handles.length - 1) {
       await sleep(DELAY_MS);
     }
@@ -549,7 +672,19 @@ export async function scrapeReelsYtdlp(
     }
     lastRequestTime = Date.now();
 
-    results[i] = await scrapeReel(url);
+    const reel = await scrapeReel(url);
+
+    // Merge in profile metadata if available (views, likes from feed API)
+    const profileData = profileReelData.get(url);
+    if (reel && profileData) {
+      reel.viewCount = reel.viewCount ?? profileData.viewCount;
+      reel.likeCount = reel.likeCount ?? profileData.likeCount;
+      reel.commentCount = reel.commentCount ?? profileData.commentCount;
+      reel.caption = reel.caption ?? profileData.caption;
+      reel.durationSeconds = reel.durationSeconds ?? profileData.durationSeconds;
+    }
+
+    results[i] = reel;
 
     if (results[i]) {
       console.log(
@@ -564,26 +699,40 @@ export async function scrapeReelsYtdlp(
   );
 
   // Enrich with Instagram GraphQL insights (views, followers, etc.)
-  console.log(`[graphql] Enriching ${scraped.length} reel(s) with insights...`);
+  // Skip enrichment for reels that already have views from profile feed
+  const needsEnrichment = scraped.filter((r) => r.viewCount == null);
+  const alreadyEnriched = scraped.filter((r) => r.viewCount != null);
+
+  if (needsEnrichment.length > 0) {
+    console.log(
+      `[graphql] Enriching ${needsEnrichment.length} reel(s) with insights (${alreadyEnriched.length} already have data)...`
+    );
+  }
+
   const enriched: ScrapedReel[] = [];
 
   for (let i = 0; i < scraped.length; i++) {
-    const reel = await enrichWithInsights(scraped[i]);
-    enriched.push(reel);
+    // Only call GraphQL for reels missing insights
+    if (scraped[i].viewCount == null || scraped[i].followerCount == null) {
+      const reel = await enrichWithInsights(scraped[i]);
+      enriched.push(reel);
 
-    if (reel.viewCount != null) {
-      console.log(
-        `[graphql] [${i + 1}/${scraped.length}] @${reel.ownerUsername} — ${reel.viewCount.toLocaleString()} views, ${reel.followerCount?.toLocaleString() ?? "?"} followers`
-      );
+      if (reel.viewCount != null) {
+        console.log(
+          `[graphql] [${i + 1}/${scraped.length}] @${reel.ownerUsername} — ${reel.viewCount.toLocaleString()} views, ${reel.followerCount?.toLocaleString() ?? "?"} followers`
+        );
+      } else {
+        console.log(
+          `[graphql] [${i + 1}/${scraped.length}] @${reel.ownerUsername ?? "unknown"} — insights unavailable`
+        );
+      }
+
+      // Small delay between GraphQL requests
+      if (i < scraped.length - 1) {
+        await sleep(500);
+      }
     } else {
-      console.log(
-        `[graphql] [${i + 1}/${scraped.length}] @${reel.ownerUsername ?? "unknown"} — insights unavailable`
-      );
-    }
-
-    // Small delay between GraphQL requests
-    if (i < scraped.length - 1) {
-      await sleep(500);
+      enriched.push(scraped[i]);
     }
   }
 
