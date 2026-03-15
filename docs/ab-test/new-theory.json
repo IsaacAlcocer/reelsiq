@@ -1,0 +1,134 @@
+{
+  "formulaCard": {
+    "creatorGoal": "Grow following in the personal branding & content creation niche",
+    "audienceTemp": "Cold to warm audiences seeking social media growth tactics and content strategy frameworks",
+    "coreHookPattern": {
+      "dominantCategory": "bold_claim",
+      "winningStructure": "Establish authority through comparison or classification, then create curiosity gap by withholding the 'how' or 'what types exist'",
+      "examples": [
+        "Old formats that used to work on social media versus new formats that are currently working on social media.",
+        "100 view hook versus a million view hook.",
+        "We all know series are one of the best ways to grow on social media... But did you know there are four main types?"
+      ],
+      "whyItWorks": "These hooks pass the Two-Step Test: (1) Instant clarity for creators seeking growth tactics, (2) Strong curiosity gap by implying the viewer's current approach is outdated or incomplete. The comparison/classification framing creates natural tension ('Which one am I using?') that demands resolution.",
+      "faceRule": "Unknown — no face presence data provided, but given the educational niche, talking-head format is likely standard.",
+      "weaknessPattern": "Reel 3's hook ('Storytelling videos') is too vague and fails instant clarity. Reel 1's hook ('This is such a reality of a business owner...') creates relatability but no curiosity gap, resulting in weak retention mechanics."
+    },
+    "retentionBlueprint": {
+      "payoffStrategy": "Mixed execution. Reels 2, 4, and 5 withhold the main actionable insight until the final third (strong payoff delay). Reels 1 and 3 lack clear payoffs entirely — they're list-based or diary-format without resolution, which works for series content but underperforms for standalone growth.",
+      "secondaryHookDensity": "Low to moderate. Reel 1 has 12 rhetorical interrupts ('Update, I got one baby right here'), but most reels (2-5) have 0-3 interrupts. This is a critical weakness — 30-60s educational content needs pattern interrupts every 3-5 seconds to maintain retention.",
+      "middleStrategy": "Numbered list progression (Reels 2, 3, 5) creates natural rhythm and anticipation ('What's type 3?'). Comparison frameworks (Reels 2, 4) maintain tension by showing weak vs. strong examples side-by-side. Reel 1's diary format lacks middle structure and likely bleeds viewers seconds 10-30.",
+      "formatStacking": "Reel 2 explicitly teaches format stacking (multitasking + clone format) but doesn't demonstrate it in its own execution. Reel 1 uses setting changes (dinner → living room → bedroom → kitchen → outdoors) as visual variety. Reels 3-5 appear to be static talking-head format with text overlays — missed opportunity for visual differentiation.",
+      "avgScriptLength": "Medium (245-285 words for educational content, 687 for diary vlog). Educational reels are 30-90s, diary is 120s+.",
+      "pacingIssue": "Rapid-fire delivery is consistent across all reels, which is strong. However, lack of secondary hooks and format variety in the middle sections creates retention risk. Reel 3's 87-word script (15-30s) is optimal density, but it lacks payoff. Reel 1's 687-word script is too long without structured payoff."
+    },
+    "packagingGenius": {
+      "dominantFramework": "Comparison A/B (Reels 2, 4) and Tastemaker Curation (Reels 3, 5)",
+      "whyItWorks": "Comparison frameworks create natural tension and self-identification ('Am I doing the 100-view version or the million-view version?'). Curation frameworks position the creator as an authority who has analyzed patterns and distilled them into actionable categories (TOFU/MOFU/BOFU, four series types). Both frameworks make abstract concepts feel immediately applicable.",
+      "bestExample": "Reel 4 ('100 view hook versus a million view hook') is the strongest packaging. It uses A/B comparison across three niches (weight loss, SAT prep, skincare) to demonstrate the pattern, then withholds the full resource (1000 viral hooks) until the CTA. This creates aspiration, validation, and a clear next step.",
+      "underutilized": "Transformation and Personal Proof frameworks are absent. Given the niche, showing 'I used this framework and grew from X to Y followers in Z months' would add credibility and emotional investment. Reel 1 attempts personal story but lacks structure or payoff.",
+      "contentFunnelMix": "Heavy TOFU bias (Reels 2, 3, 4, 5 are all broad educational tips). Reel 1 is MOFU (diary series builds parasocial trust). Missing BOFU entirely — no case studies, client results, or transformation stories to convert warm audiences into followers/customers."
+    },
+    "trustSignals": {
+      "authorityMechanics": "Social proof through name-dropping ('fastest growing creators,' specific creator examples in Reel 5). Classification systems (TOFU/MOFU/BOFU, four series types) demonstrate organized expertise. Comparison frameworks imply the creator has analyzed thousands of videos to identify patterns.",
+      "vulnerabilityMoments": "Reel 5: 'I'm so sorry if I butchered that' — acknowledges imperfection, increases relatability. Reel 1: 'This is such a reality of a business owner' — validates shared struggle. However, these are minimal. More vulnerability would strengthen trust.",
+      "proofElements": "Reel 4 uses specific quantified results in examples ('I lost over 30 pounds in four months,' 'dropped my SAT score from 1270 to 1580'). Reel 2 references 'videos that went viral' but doesn't show the creator's own results. Missing: personal transformation metrics, follower growth screenshots, client testimonials.",
+      "aiDetectionRisk": "Low. Vocabulary is conversational ('Guys, this is why we love living in the wilderness,' 'Hey, I never said it was easy'). Sentence rhythm is rapid-fire and natural. However, Reels 3 and 4 use more formal phrasing ('Client before and after testimonials,' 'healed my hyperpigmentation') that could feel slightly robotic without vocal delivery variation.",
+      "viewerFocusRatio": "Strong in educational reels (2, 4, 5) — content leads with viewer transformation ('you can steal,' 'you can use to grow'). Weak in Reel 1 — diary format is creator-focused ('I'm in the process of making our house a home'). Reel 3 is framework-focused rather than viewer-focused."
+    },
+    "sessionStrategy": {
+      "ctaType": "Mixed. Reels 2 and 5: Direct follow CTAs ('follow for more social media marketing education'). Reel 4: Engagement prompt ('comment hook and I'll send them over'). Reel 1: Series reference ('Weekly Diary - Episode #4'). Reel 3: No CTA.",
+      "platformBehavior": "Reel 4's comment-based CTA is optimal for growth — drives engagement, keeps viewers on platform, boosts algorithmic reach. Reels 2 and 5's follow CTAs are acceptable but less interactive. Reel 1's series reference drives profile revisits. Reel 3's lack of CTA is a missed opportunity.",
+      "externalLinkRisk": "None detected. No external links, which is correct for a growing account.",
+      "seriesMechanics": "Reel 1 is part of a 'Weekly Diary' series (Episode #4), which builds habit and anticipation. Reel 5 teaches series frameworks but doesn't implement one. Opportunity: Create a numbered educational series ('5 Hook Frameworks That Got Me 10M Views — Part 1/5') to drive binge-watching and profile visits.",
+      "bingeTrigger": "Weak. Educational reels are standalone rather than sequenced. Reel 1's diary series has binge potential but lacks clear episode structure or cliffhangers. Recommendation: End educational reels with 'Part 2 drops tomorrow' or 'See the full breakdown in my next video.'"
+    },
+    "algorithmCompatibility": {
+      "sessionTimeOptimization": "Reel 4's comment CTA and Reel 1's series reference extend session time. However, most reels lack profile-visit drivers beyond generic follow CTAs. Opportunity: Add 'Link in bio for the full framework' or 'Check my last 3 videos for examples' to drive profile exploration.",
+      "skipRateRisk": "High risk in Reels 1 and 3. Reel 1's diary format lacks hooks and payoff structure — viewers likely skip after 10-15s. Reel 3's weak hook ('Storytelling videos') and lack of payoff create early drop-off. Reels 2, 4, 5 have strong hooks and payoff delay, reducing skip rate.",
+      "shareabilityFactors": "Reels 3 and 5 are highly shareable — they're classification frameworks that creators will save/share as reference guides. Reel 4 is shareable as a 'steal this' resource. Reel 2 is moderately shareable (format stacking concept). Reel 1 is not shareable (personal diary content).",
+      "commentDrivers": "Reel 4's explicit comment prompt ('comment hook') is the only strong comment driver. Opportunity: Add polarizing takes ('Most creators get this wrong'), questions ('Which format do you use most?'), or fill-in-the-blank prompts ('My biggest content struggle is ___') to boost comments.",
+      "lengthVsValue": "Reel 3 (15-30s, 87 words) has optimal length but lacks payoff. Reels 2, 4, 5 (30-90s, 245-285 words) balance length and value well. Reel 1 (120s+, 687 words) is too long without structured payoff — should be cut to 60-90s or broken into series episodes with cliffhangers."
+    },
+    "vocabularyDNA": {
+      "dominantTone": "Conversational and aspirational. Uses 'you' language ('you can steal,' 'you can use'), casual interjections ('Guys,' 'Hey,' 'folks'), and direct address. Avoids jargon except for niche-specific terms (TOFU/MOFU/BOFU, format stack).",
+      "signaturePhrases": [
+        "This is such a reality of...",
+        "Guys, this is why...",
+        "Hey, I never said it was easy",
+        "And that is it, folks",
+        "If you want [result], just comment [word] and I'll send them over"
+      ],
+      "sentenceStructure": "Rapid-fire, short sentences. Heavy use of numbered lists and comparison structures. Minimal complex sentences or subordinate clauses. Example: 'Old formats that used to work. New formats that are currently working.' vs. 'While old formats used to work, new formats are currently working.'",
+      "emotionalRange": "Relatability (Reel 1: 'reality of a business owner'), Aspiration (Reels 2, 4, 5: 'viral hooks,' 'fastest growing creators'), Validation (Reel 3: organizing content types). Missing: Urgency, fear of missing out, contrarian anger.",
+      "avoidPatterns": "Avoid formal academic language, long-winded explanations, and hedging ('maybe,' 'possibly'). Avoid creator-focused language in educational content ('I think,' 'In my opinion'). Avoid robotic transitions ('Furthermore,' 'Additionally')."
+    },
+    "weaknessAudit": {
+      "structuralFlaws": [
+        "Reel 1: No payoff structure. Diary format strings together moments without resolution or takeaway. Should either add a final insight ('Here's what I learned this week') or use cliffhangers between episodes.",
+        "Reel 3: No payoff. Lists content types by funnel stage but doesn't explain when to use each or how to choose. Should end with 'Use TOFU for reach, MOFU for trust, BOFU for conversion — pick based on your current goal.'",
+        "Reels 2, 4, 5: Low secondary hook density. 30-90s videos need pattern interrupts every 3-5s (zooms, text changes, rhetorical pivots). Currently relying on numbered list structure alone."
+      ],
+      "hookFailures": [
+        "Reel 3: 'Storytelling videos' is too vague. Fails instant clarity. Should be 'The 3 content types that actually convert followers' or 'TOFU vs MOFU vs BOFU — which should you post?'",
+        "Reel 1: 'This is such a reality of a business owner' creates relatability but no curiosity gap. Should add 'and here's how I finally fixed it' or 'but I found a system that changed everything.'"
+      ],
+      "middleDeath": "Reels 2, 4, 5 likely experience drop-off seconds 10-30 due to static format and low secondary hook density. Recommendation: Add format stacking (split-screen examples, screen recordings, B-roll of viral videos being analyzed) and rhetorical pivots ('But here's the problem most creators miss...').",
+      "trustGaps": "No personal transformation metrics shown. Claims like 'fastest growing creators' and 'million view hooks' lack proof. Should add: 'I analyzed 10,000 viral reels to find this pattern' or 'This framework grew my account from 5K to 50K in 3 months.'",
+      "missedOpportunities": [
+        "No BOFU content. Add case studies, client results, or 'I used this framework and here's what happened' transformations.",
+        "No series structure in educational content. Create numbered series ('5 Hook Frameworks — Part 1/5') to drive binge-watching.",
+        "No polarizing takes or contrarian angles. Add 'Why most hook advice is wrong' or 'The format everyone uses that kills reach.'",
+        "No vulnerability in educational content. Add 'I wasted 6 months using the wrong hooks before I figured this out.'"
+      ]
+    },
+    "formatStackingOpportunity": {
+      "currentFormats": "Talking-head (likely dominant in Reels 2-5), diary vlog with setting changes (Reel 1), text overlays (all reels). Missing: split-screen comparisons, screen recordings, B-roll of examples, clone format, multitasking format.",
+      "recommendedStack": "For comparison reels (2, 4): Use split-screen showing weak vs. strong examples side-by-side. For list reels (3, 5): Use screen recordings of actual creator profiles/videos being referenced. For all educational content: Add multitasking format (talking while demonstrating on phone/laptop) to increase visual interest.",
+      "exampleImplementation": "Reel 4 ('100 view hook vs million view hook'): Start with talking-head hook, transition to split-screen showing actual videos side-by-side, zoom in on view counts, return to talking-head for CTA. This stacks 3 formats in 60s and demonstrates the concept visually."
+    },
+    "growthProjection": {
+      "currentStrengths": [
+        "Strong hook clarity and curiosity gaps in educational content (Reels 2, 4, 5)",
+        "Effective packaging frameworks (comparison A/B, tastemaker curation)",
+        "Platform-native CTAs (comment prompts, follow requests, series references)",
+        "Rapid-fire pacing and conversational tone",
+        "Shareable classification frameworks (TOFU/MOFU/BOFU, four series types)"
+      ],
+      "growthCeiling": "Current formula will generate steady TOFU reach (views) but struggle to convert viewers into followers. Reels 2, 4, 5 are optimized for virality but lack differentiation and trust-building. Reel 1's diary series builds trust but lacks structure and shareability. Without MOFU/BOFU content and personal proof, growth will plateau at the 'educational content creator' level without breaking into 'trusted authority' tier.",
+      "breakthroughMoves": [
+        "Add personal transformation proof to educational content: 'This hook framework took me from 5K to 50K followers in 90 days — here's the exact structure.' This combines TOFU reach with MOFU trust.",
+        "Implement numbered series for educational content: '5 Hook Frameworks That Got Me 10M Views — Part 1/5.' Post daily for 5 days to create binge-watching and habit formation.",
+        "Stack formats in every video: talking-head + split-screen examples + screen recordings. Reel 2 teaches format stacking but doesn't demonstrate it — practice what you preach.",
+        "Add secondary hooks every 3-5 seconds: zooms, text changes, rhetorical pivots ('But here's what most creators miss...'), pattern interrupts. Current density is too low for 30-90s content.",
+        "Create BOFU content: 'I used these 3 frameworks to grow 5 clients from 0 to 10K followers — here's the exact process.' This converts warm audiences into leads/customers.",
+        "Add contrarian angles: 'Why most hook advice is wrong' or 'The format everyone uses that kills reach.' This creates polarization and comment engagement."
+      ],
+      "avoidRegression": [
+        "Don't abandon the diary series (Reel 1) — it builds parasocial trust. But add structure: clear episode themes, cliffhangers, weekly insights.",
+        "Don't over-rely on TOFU content. Balance with MOFU (personal stories, wins/losses) and BOFU (case studies, transformations).",
+        "Don't use generic follow CTAs exclusively. Rotate between comment prompts, series teasers, and profile-visit drivers.",
+        "Don't let format become static. Even talking-head content needs visual variety (setting changes, props, split-screen)."
+      ]
+    },
+    "nextVideoBlueprint": {
+      "suggestedTopic": "Personal transformation case study combining TOFU reach with MOFU trust",
+      "hookStructure": "Bold claim with quantified result + curiosity gap. Example: 'I analyzed 10,000 viral reels and found 3 patterns that predict virality — here's what nobody talks about.' This passes the Two-Step Test: instant clarity (viral reel analysis) + curiosity gap (what are the 3 patterns?).",
+      "packagingChoice": "Layered Reveal: Start with the result ('I grew from 5K to 50K followers in 90 days'), then reveal the 3 frameworks used, then show proof (screenshots, metrics), then explain why most creators miss these patterns. This combines aspiration, validation, and authority.",
+      "retentionTactics": [
+        "Payoff delay: Withhold the 3rd framework until the final 10 seconds",
+        "Secondary hooks every 5 seconds: 'But here's the problem...', 'Framework #2 is counterintuitive...', 'This is the one most creators ignore...'",
+        "Format stacking: Talking-head hook → screen recording showing follower growth graph → split-screen showing example reels → talking-head payoff",
+        "Numbered list structure: 'Framework 1... Framework 2... Framework 3...' creates natural rhythm and anticipation"
+      ],
+      "ctaStrategy": "Engagement prompt: 'Comment FORMULA and I'll send you the full breakdown with 50 example reels.' This drives comments (algorithmic boost), keeps viewers on platform, and creates a lead magnet for DM follow-up.",
+      "lengthTarget": "60-90 seconds (285-400 words). Long enough to deliver value and build trust, short enough to maintain retention.",
+      "successMetrics": "Track saves (shareable framework), comments (engagement prompt), profile visits (authority positioning), and follower conversion rate (trust-building). A successful video should have 2-3x higher follower conversion than current TOFU content."
+    },
+    "philosophicalNote": {
+      "stylePreservation": "The creator's conversational tone, rapid-fire pacing, and direct address ('Guys,' 'Hey,' 'folks') are strengths. Don't sanitize this into formal educational content. The vulnerability moments ('I'm so sorry if I butchered that') and relatable observations ('This is such a reality of a business owner') humanize the content and should be amplified, not removed.",
+      "formulaVsPrinciples": "The current formula (comparison frameworks + numbered lists + rapid-fire delivery) is effective for TOFU reach but incomplete for sustained growth. The principles to internalize: (1) Every video needs instant clarity + curiosity gap, (2) Payoff delay drives retention, (3) Personal proof builds trust, (4) Format stacking maintains attention, (5) Platform-native CTAs extend sessions. Apply these principles across different formats and topics rather than repeating the same comparison structure.",
+      "longTermIdentity": "The creator is positioned as a 'social media educator' but hasn't differentiated from the thousands of other educators in this niche. The breakthrough will come from adding personal transformation proof ('I did this and here's what happened') and contrarian angles ('Why most advice is wrong'). The diary series (Reel 1) is a unique asset — lean into it as a MOFU trust-builder while using educational content for TOFU reach. The combination of 'relatable human' (diary) + 'proven expert' (case studies) + 'organized educator' (frameworks) creates a defensible brand position."
+    }
+  }
+}
