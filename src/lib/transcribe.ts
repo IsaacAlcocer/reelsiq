@@ -174,7 +174,20 @@ export async function ensureTranscript(
     } catch {
       // Retry once on failure (per spec Section 11)
       console.log(`[transcribe] Whisper failed, retrying once...`);
-      whisperText = await whisperTranscribe(audioPath);
+      try {
+        whisperText = await whisperTranscribe(audioPath);
+      } catch (retryErr) {
+        // If retry also fails, return gracefully instead of crashing
+        console.error(
+          `[transcribe] Whisper failed after retry for ${reel.url}: ${(retryErr as Error).message}`
+        );
+        return {
+          transcript: null,
+          wordCount: 0,
+          source: "none" as const,
+          visualOnly: true,
+        };
+      }
     }
 
     const wc = countWords(whisperText);
@@ -222,7 +235,19 @@ export async function ensureTranscripts(
   async function worker() {
     while (idx < reels.length) {
       const i = idx++;
-      results[i] = await ensureTranscript(reels[i]);
+      try {
+        results[i] = await ensureTranscript(reels[i]);
+      } catch (err) {
+        console.error(
+          `[transcribe] Unexpected error for ${reels[i].url}: ${(err as Error).message}`
+        );
+        results[i] = {
+          transcript: null,
+          wordCount: 0,
+          source: "none",
+          visualOnly: true,
+        };
+      }
     }
   }
 
