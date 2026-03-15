@@ -9,6 +9,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { ScriptScorecard, RefinedScript } from "@/types/script-audit";
 import { THEORY_SYSTEM_PROMPT } from "./theory-prompt";
 import { tryParseJson } from "./parse-json";
+import { BANNED_WORDS_GUIDANCE, HUMANIZER_GUIDANCE } from "./social-lexicon";
+
+export type HumanizeMode = "auto" | "on" | "off";
 
 // ---------------------------------------------------------------------------
 // Anthropic client (lazy singleton)
@@ -29,15 +32,16 @@ function getClient(): Anthropic {
 }
 
 // ---------------------------------------------------------------------------
-// Minimal voice guidance — theory system prompt handles the rest
+// Voice guidance — structure-only mode preserves creator's original words
 // ---------------------------------------------------------------------------
 
-const VOICE_GUIDANCE = `
-VOICE PRESERVATION: The output must sound like the same creator wrote it.
-- Preserve the creator's vocabulary, sentence rhythm, tone, and energy level
+const VOICE_PRESERVATION = `
+VOICE PRESERVATION: Keep the creator's original words. You are rearranging, not rewriting.
+- Keep 90%+ of the creator's exact wording — only change structure and ordering
+- Preserve their vocabulary, sentence rhythm, tone, and energy level
 - Use their contractions, slang, and phrasing patterns — don't "clean up" their voice
-- Only flag phrases that are inconsistent with the rest of the script's own voice (e.g. a casual script with one overly formal sentence)
-- If the script sounds natural, keep it natural. If it's polished, keep it polished. Match what's already there.`;
+- Only add new words where absolutely needed for transitions between rearranged sections
+- If it sounds natural already, keep it natural. Match what's already there.`;
 
 // ---------------------------------------------------------------------------
 // Shared JSON schema for all refinement modes
@@ -121,7 +125,8 @@ Key priorities:
 - Ensure the payoff is in the final third
 - Replace AI-sounding phrases with natural language — it should sound like someone talking, not reading
 - Keep approximately the same length (±20% words)
-${VOICE_GUIDANCE}
+${BANNED_WORDS_GUIDANCE}
+${HUMANIZER_GUIDANCE}
 ${JSON_SCHEMA}`;
 }
 
@@ -156,7 +161,8 @@ Apply your growth theory knowledge to fix the specific issues above. This script
 - Fix the hook if it doesn't pass the Two-Step Test
 - Rearrange for better payoff positioning if needed
 - Keep approximately the same length (±20% words)
-${VOICE_GUIDANCE}
+${VOICE_PRESERVATION}
+${BANNED_WORDS_GUIDANCE}
 ${JSON_SCHEMA}`;
 }
 
@@ -189,7 +195,8 @@ This script already works well. Make small polish-level adjustments only:
 - Keep 90%+ of the original text unchanged
 - Do NOT restructure, change frameworks, or move the payoff
 - If it's already excellent, return it nearly as-is
-${VOICE_GUIDANCE}
+${VOICE_PRESERVATION}
+${BANNED_WORDS_GUIDANCE}
 ${JSON_SCHEMA}`;
 }
 
@@ -201,7 +208,8 @@ function selectPrompt(
   originalScript: string,
   scorecard: ScriptScorecard,
   niche: string,
-  goal: string
+  goal: string,
+  humanize: HumanizeMode = "auto"
 ): string {
   // Convergence: script is already strong — minor tweaks only
   if (scorecard.overallScore >= 85) {
@@ -209,7 +217,18 @@ function selectPrompt(
     return buildConvergencePrompt(originalScript, scorecard, niche, goal);
   }
 
-  // AI-detected: enhance + humanize
+  // Explicit humanize toggle overrides auto-detection
+  if (humanize === "on") {
+    console.log("[refine-script] Humanization mode — user toggled ON");
+    return buildHumanizationPrompt(originalScript, scorecard, niche, goal);
+  }
+
+  if (humanize === "off") {
+    console.log("[refine-script] Targeted edit mode — user toggled OFF (keep voice)");
+    return buildTargetedEditPrompt(originalScript, scorecard, niche, goal);
+  }
+
+  // Auto mode: use AI detection score to decide
   const aiRisk = scorecard.authenticityAssessment.aiDetectionRisk;
   if (aiRisk === "medium" || aiRisk === "high") {
     console.log(`[refine-script] Humanization mode — AI detection risk: ${aiRisk}`);
@@ -235,10 +254,11 @@ export async function refineScript(
   originalScript: string,
   scorecard: ScriptScorecard,
   niche: string,
-  goal: string
+  goal: string,
+  humanize: HumanizeMode = "auto"
 ): Promise<RefineResult> {
   const client = getClient();
-  const userPrompt = selectPrompt(originalScript, scorecard, niche, goal);
+  const userPrompt = selectPrompt(originalScript, scorecard, niche, goal, humanize);
 
   // First attempt
   let raw = await callSonnet(client, userPrompt);

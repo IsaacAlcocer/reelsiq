@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getJobOrSaved } from "@/lib/job-store";
 import type { ScriptsJobResult } from "@/lib/job-store";
 import type { ScriptAuditResult } from "@/types/script-audit";
-import { refineScript } from "@/lib/refine-script";
+import { refineScript, type HumanizeMode } from "@/lib/refine-script";
 
 export async function POST(
   req: NextRequest,
@@ -25,7 +25,7 @@ export async function POST(
     );
   }
 
-  let body: { scriptIndex?: number };
+  let body: { scriptIndex?: number; humanize?: string };
   try {
     body = await req.json();
   } catch {
@@ -43,6 +43,9 @@ export async function POST(
     );
   }
 
+  const humanize: HumanizeMode =
+    body.humanize === "on" || body.humanize === "off" ? body.humanize : "auto";
+
   if (scriptIndex >= job.scripts.length) {
     return NextResponse.json(
       { error: `scriptIndex ${scriptIndex} is out of range.` },
@@ -51,11 +54,12 @@ export async function POST(
   }
 
   const result = job.result as ScriptsJobResult;
+  const cacheKey = `${scriptIndex}_${humanize}`;
 
-  // Return cached result if already refined
-  if (result.refinedScripts[scriptIndex]) {
+  // Return cached result if already refined with same humanize mode
+  if (result.refinedScripts[cacheKey]) {
     return NextResponse.json({
-      refined: result.refinedScripts[scriptIndex],
+      refined: result.refinedScripts[cacheKey],
       cached: true,
     });
   }
@@ -77,7 +81,8 @@ export async function POST(
       originalScript.content,
       scorecard,
       job.niche,
-      job.goal
+      job.goal,
+      humanize
     );
 
     if (!refineResult.refined) {
@@ -87,8 +92,8 @@ export async function POST(
       );
     }
 
-    // Cache on the job
-    result.refinedScripts[scriptIndex] = refineResult.refined;
+    // Cache on the job (keyed by scriptIndex + humanize mode)
+    result.refinedScripts[cacheKey] = refineResult.refined;
 
     return NextResponse.json({
       refined: refineResult.refined,

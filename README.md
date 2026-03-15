@@ -4,6 +4,8 @@ A theory-enhanced Instagram Reels analysis engine that extracts viral content pa
 
 ReelsIQ is not a metrics dashboard. It explains **why** content works at the script and structure level, evaluated against Instagram's 2026 algorithm mechanics, hook psychology, retention science, and content architecture.
 
+Two modes: **Reel Analysis** reverse-engineers top-performing content into a 13-section Formula Card playbook. **Script Lab** audits your own scripts against the same theory framework and can rewrite them with an adaptive AI refiner.
+
 ---
 
 ## Table of Contents
@@ -17,6 +19,11 @@ ReelsIQ is not a metrics dashboard. It explains **why** content works at the scr
   - [Viewing Results](#viewing-results)
   - [Exporting Results](#exporting-results)
 - [Understanding the Formula Card](#understanding-the-formula-card)
+- [Script Lab](#script-lab)
+  - [Script Audit](#script-audit)
+  - [Script Refiner](#script-refiner)
+  - [Humanizer Toggle](#humanizer-toggle)
+  - [Social Media Lexicon](#social-media-lexicon)
 - [The Theory Engine](#the-theory-engine)
 - [API Reference](#api-reference)
 - [Testing Scripts](#testing-scripts)
@@ -27,6 +34,8 @@ ReelsIQ is not a metrics dashboard. It explains **why** content works at the scr
 ---
 
 ## How It Works
+
+### Reel Analysis Pipeline
 
 ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 
@@ -51,6 +60,28 @@ ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 **Stage 4 - Cross-Reel Synthesis:** All successful per-reel analyses are batched into a single Claude Sonnet 4.5 call. This call is prefixed with the Theory System Prompt — a comprehensive Instagram growth theory framework — and produces the Formula Card by finding patterns across all analyzed reels and evaluating them against the theory.
 
 **Stage 5 - Formula Card:** The final output is a 13-section playbook ready for immediate use. Results are stored in-memory with a 30-minute TTL.
+
+### Script Lab Pipeline
+
+Script Lab skips scraping and transcription — users paste their own scripts directly:
+
+```
+1. ANALYZING       Claude Haiku extracts 23 structured fields per script
+         |
+2. AUDITING        Claude Sonnet evaluates all scripts against growth theory
+         |
+3. SCORECARDS      Per-script grades, issues, and refined openings
+         |
+4. REFINING        (Optional) On-demand Sonnet rewrite with humanizer toggle
+```
+
+**Stage 1 - Analysis:** Each script is sent to Claude Haiku for structured extraction, using an adapted prompt that doesn't expect video metadata. Produces the same 23-field `ReelAnalysis` schema as Reel Analysis.
+
+**Stage 2 - Audit:** All analyses plus the original script texts are sent to Claude Sonnet with the Theory System Prompt. Produces a `ScriptAuditResult` with per-script scorecards and cross-script patterns.
+
+**Stage 3 - Scorecards:** Each script gets an overall score (0-100), a verdict (Ready to Post / Needs Refinement / Rework Needed), and detailed grades for hook, structure, retention, authenticity, and algorithm alignment.
+
+**Stage 4 - Refinement:** After reviewing their scorecard, users can click "Refine This Script" to trigger an on-demand Sonnet rewrite that addresses all identified issues. See [Script Refiner](#script-refiner) below.
 
 ---
 
@@ -155,10 +186,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 On the home page, you'll see the input form with these fields:
 
-**Input Mode — URLs or Handles (at least one required):**
+**Input Mode (toggle between three modes):**
 
 - **Reel URLs**: Paste up to 30 Instagram Reel URLs (one per line, or comma-separated). Must match `instagram.com/reel/` or `instagram.com/p/` format. Duplicates are automatically removed.
 - **Handles**: Enter up to 3 Instagram handles (e.g., `@username`). The system will pull their recent reels and select the top-performing ones by view count.
+- **Script Lab**: Paste up to 10 of your own scripts (minimum 20 words each) to audit them against the growth theory framework. See [Script Lab](#script-lab).
 
 **Configuration:**
 
@@ -167,11 +199,11 @@ On the home page, you'll see the input form with these fields:
   - Grow following
   - Generate leads
   - Build brand awareness
-- **Depth**: Choose analysis depth:
+- **Depth** (Reel URLs/Handles only): Choose analysis depth:
   - **Quick** — Analyzes up to 10 reels. Faster and cheaper.
   - **Deep** — Analyzes up to 25 reels. More data points for stronger pattern detection.
 
-Click **Analyze** to submit. You'll be redirected to the results page immediately.
+Click **Analyze Reels** or **Audit Scripts** to submit. You'll be redirected to the results page immediately.
 
 ### Viewing Results
 
@@ -298,6 +330,93 @@ A structured action plan for implementing the Formula Card findings:
 
 ---
 
+## Script Lab
+
+Script Lab is the second mode of ReelsIQ. Instead of analyzing existing Instagram Reels, you paste your own scripts and get them evaluated against the same growth theory framework.
+
+### Script Audit
+
+Each submitted script is analyzed and scored across five weighted areas:
+
+| Area | Weight | What it measures |
+|------|--------|------------------|
+| Hook | 25% | Clarity, curiosity gap, Two-Step Test pass/fail |
+| Structure | 20% | Narrative flow, detected framework, organizational effectiveness |
+| Retention | 25% | Payoff positioning, rhetorical interrupt density, curiosity maintenance |
+| Authenticity | 20% | Trust Recession alignment, AI detection risk, flagged phrases |
+| Algorithm Alignment | 10% | Session time signals, engagement fit, distribution potential |
+
+**Scoring:** Grades (strong = 1.0, moderate = 0.6, weak = 0.2) are combined with weights to produce a 0-100 overall score.
+
+**Verdicts:**
+- **75+** = Ready to Post
+- **50-74** = Needs Refinement
+- **< 50** = Rework Needed
+
+**Per-script output includes:**
+- Overall score with animated score ring
+- Verdict badge
+- Detailed assessment per area with grade, feedback, and specific metrics
+- AI detection risk level (low/medium/high) with flagged phrases highlighted
+- Algorithm alignment signals (aligned/partially aligned/misaligned)
+- Prioritized issues list with severity (critical/moderate/minor) and fix suggestions
+- A refined opening based on winning hook patterns
+- Cross-script patterns across all submitted scripts
+
+### Script Refiner
+
+After reviewing a scorecard, click **"Refine This Script"** on any individual script to trigger an on-demand Claude Sonnet rewrite.
+
+The refiner is **adaptive** — it automatically picks the right strategy based on the script's score and AI detection level:
+
+| Score | AI Detection Risk | Strategy | What it does |
+|-------|-------------------|----------|-------------|
+| 85+ | Any | Convergence | Minor polish only. Sharpens a word, tightens a sentence. 90%+ of text unchanged. |
+| < 85 | Medium or High | Humanization | Full structural improvement + replaces AI-sounding language with natural, conversational phrasing. |
+| < 85 | Low | Targeted Edit | Structural improvements only. Keeps the creator's voice, words, and tone intact. |
+
+**Refined output includes:**
+- Full rewritten script with copy-to-clipboard
+- Score improvement banner (original score, refined score, delta)
+- Hook before/after comparison (side-by-side)
+- Detailed changelog — every change listed with the specific growth-theory reasoning
+- Summary of what was improved and why
+
+Refined scripts are cached server-side so subsequent requests return instantly.
+
+### Humanizer Toggle
+
+A three-option toggle appears above the "Refine This Script" button, letting users control how much of their original text gets rewritten:
+
+| Mode | Label | When to use | Behavior |
+|------|-------|-------------|----------|
+| **Auto** | Auto-detect | Default — let the system decide | Uses the AI detection risk from the scorecard. Medium/high risk triggers humanization; low risk triggers structure-only. |
+| **On** | Humanize language | AI-generated scripts, ChatGPT output | Full rewrite — replaces formal/corporate language with casual, conversational phrasing throughout the entire script. |
+| **Off** | Keep my voice | Scripts you wrote yourself | Structure-only — rearranges for better hooks and payoff delay but keeps 90%+ of the creator's original words. |
+
+Different humanizer modes are cached separately, so users can try multiple modes on the same script without re-running the analysis.
+
+### Social Media Lexicon
+
+All three humanizer modes enforce a **banned words list** that prevents Claude from introducing AI-sounding language in its own output. This is always active — it constrains the AI's writing, not the creator's input.
+
+**Banned words** (Claude will never use these in refined output):
+- Corporate vocabulary: leverage, utilize, delve, facilitate, encompass, robust, streamline, optimize, synergy, pivotal, holistic, elevate, empower, paradigm, innovative, cutting-edge, transformative, harness, navigate, landscape, ecosystem, unlock, amplify
+- Formal transitions: furthermore, moreover, additionally, consequently, nevertheless, in addition, as a result, it is worth noting
+- Filler phrases: it's important to note, in today's landscape, at the end of the day, the reality is that, when it comes to, needless to say
+
+**Writing rules enforced:**
+- Always use contractions (don't, won't, here's)
+- Fragment sentences encouraged ("Dead serious." "Game changer.")
+- Start sentences with "And," "But," "So," "Look"
+- One idea per sentence — short and punchy
+- No semicolons in social media scripts
+- Write like talking to a friend, not presenting at a conference
+
+When humanization mode is active (toggle = "On" or auto-detected), additional rules rewrite the entire script: replacing formal language with casual equivalents, adding casual connectors ("here's the thing," "but wait"), using rhetorical questions to break up monologues, and preferring specific numbers over vague claims.
+
+---
+
 ## The Theory Engine
 
 The synthesis stage uses a comprehensive Instagram Growth Theory framework as its system prompt. This is not generic AI analysis — every pattern is evaluated against proven growth mechanics:
@@ -417,6 +536,53 @@ When `status` is `complete`, `result` contains:
 
 ---
 
+### POST `/api/jobs/[jobId]/refine` — Refine a Script
+
+Triggers an on-demand Claude Sonnet rewrite for a single script from a completed Script Lab job.
+
+**Request Body:**
+
+```json
+{
+  "scriptIndex": 0,
+  "humanize": "auto"
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `scriptIndex` | number | Yes | Index of the script to refine (0-based) |
+| `humanize` | string | No | `"auto"` (default), `"on"`, or `"off"`. Controls rewriting intensity. |
+
+**Response (200):**
+
+```json
+{
+  "refined": {
+    "refinedContent": "the enhanced script...",
+    "changes": [
+      { "area": "hook", "what": "rewrote opening", "why": "Two-Step Test failure" }
+    ],
+    "estimatedScoreAfter": 78,
+    "hookComparison": {
+      "before": "original hook text",
+      "after": "refined hook text"
+    },
+    "summaryOfChanges": "Improved hook clarity and..."
+  },
+  "cached": false
+}
+```
+
+**Errors:**
+- `400` — Invalid script index, job not a script job, or job not complete
+- `404` — Job not found or expired
+- `500` — Refinement failed (AI error or JSON parse failure)
+
+Results are cached by `scriptIndex + humanize` mode. Subsequent requests with the same parameters return `cached: true`.
+
+---
+
 ### POST `/api/jobs/[jobId]/export` — Export Formula Card
 
 **Query Parameters:**
@@ -463,18 +629,25 @@ src/
 │   │   ├── route.ts                    # POST - create analysis job
 │   │   └── [jobId]/
 │   │       ├── status/route.ts         # GET - poll job progress
-│   │       └── export/route.ts         # POST - export results
+│   │       ├── export/route.ts         # POST - export results
+│   │       └── refine/route.ts         # POST - refine a script (Script Lab)
 │   ├── analysis/[jobId]/page.tsx       # Results page with progress + Formula Card
 │   ├── guide/page.tsx                  # Educational guide + glossary
 │   ├── layout.tsx                      # Root layout (dark theme)
 │   ├── page.tsx                        # Home page (input form)
 │   └── globals.css                     # Tailwind + custom styles
 ├── components/
-│   ├── InputForm.tsx                   # URL/handle input, niche/goal/depth config
+│   ├── InputForm.tsx                   # URL/handle/script input, niche/goal/depth config
 │   ├── ProgressIndicator.tsx           # Pipeline stage progress display
 │   ├── GuidedTour.tsx                  # Interactive Formula Card tour
 │   ├── InfoTip.tsx                     # Glossary term tooltip
 │   ├── ConfidenceBadge.tsx             # High/medium/low confidence badge
+│   ├── ScriptAudit/
+│   │   ├── ScriptAuditView.tsx        # Script Lab results container
+│   │   ├── ScriptScorecardCard.tsx    # Per-script scorecard with humanizer toggle
+│   │   ├── RefinedScriptView.tsx      # Refined script display (score delta, hook comparison, changelog)
+│   │   ├── VerdictBadge.tsx           # Ready to Post / Needs Refinement / Rework Needed
+│   │   └── GradeBadge.tsx             # Strong / Moderate / Weak assessment badge
 │   └── FormulaCard/
 │       ├── FormulaCard.tsx             # Master container (renders 13 sections)
 │       ├── AlgorithmAlignment.tsx      # Section 1: Algorithm alignment score
@@ -503,11 +676,18 @@ src/
 │   ├── transcribe.ts                   # Transcript quality gate + Groq Whisper
 │   ├── analyze.ts                      # Per-reel Claude Haiku extraction
 │   ├── synthesize.ts                   # Cross-reel Claude Sonnet synthesis
+│   ├── analyze-script.ts               # Per-script Haiku extraction (Script Lab)
+│   ├── audit.ts                        # Script audit Sonnet synthesis (scorecards)
+│   ├── script-processor.ts             # Script Lab pipeline orchestrator
+│   ├── refine-script.ts                # On-demand Sonnet script rewriter (Tier 2)
+│   ├── social-lexicon.ts               # Banned words list + humanizer guidance
+│   ├── scoring.ts                      # Deterministic 0-100 score from area grades
 │   ├── theory-prompt.ts                # Instagram Growth Theory system prompt
 │   ├── glossary.ts                     # Searchable glossary entries
 │   └── parse-json.ts                   # Robust JSON parsing (fences, regex fallback)
 ├── types/
-│   └── formula-card.ts                 # TypeScript interfaces for Formula Card
+│   ├── formula-card.ts                 # TypeScript interfaces for Formula Card
+│   └── script-audit.ts                 # TypeScript interfaces for Script Lab + Refiner
 scripts/
 ├── test-scraper.ts                     # Test yt-dlp + GraphQL scraping
 ├── test-transcribe.ts                  # Test transcription pipeline
@@ -520,6 +700,8 @@ docs/
 
 ### Processing Pipeline Concurrency
 
+**Reel Analysis:**
+
 | Stage | Concurrency | Service |
 |-------|-------------|---------|
 | Scraping | 3 concurrent | yt-dlp + Instagram GraphQL |
@@ -527,8 +709,17 @@ docs/
 | Analyzing | 10 concurrent | Claude Haiku 4.5 |
 | Synthesizing | 1 (single call) | Claude Sonnet 4.5 |
 
+**Script Lab:**
+
+| Stage | Concurrency | Service |
+|-------|-------------|---------|
+| Analyzing | 10 concurrent | Claude Haiku 4.5 |
+| Auditing | 1 (single call) | Claude Sonnet 4.5 |
+| Refining | 1 (on-demand, per-script) | Claude Sonnet 4.5 |
+
 ### Data Flow
 
+**Reel Analysis:**
 ```
 User Input (URLs/handles + niche + goal + depth)
     │
@@ -548,6 +739,28 @@ Job Processor ─── Stage 1: yt-dlp + GraphQL ──────────
     │                  │                              FormulaCard
     │                  ▼
     └──────────── Complete ──► Results Page + Export
+```
+
+**Script Lab:**
+```
+User Input (scripts + niche + goal)
+    │
+    ▼
+Job Store (in-memory, 30-min TTL)
+    │
+    ▼
+Script Processor ─── Stage 1: Claude Haiku ──────────── ReelAnalysis[]
+    │                                                        │
+    │                 Stage 2: Claude Sonnet ◄───────────────┘
+    │                     │                        ScriptAuditResult
+    │                     ▼                        (scorecards + patterns)
+    └──────────── Complete ──► Scorecards + Refine Button
+                                    │
+                                    ▼ (on-demand, per-script)
+                              Sonnet Refiner + Social Media Lexicon
+                                    │          + Humanizer Toggle
+                                    ▼
+                              RefinedScript (cached)
 ```
 
 ### State Management

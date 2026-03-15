@@ -50,8 +50,8 @@ export interface ScriptsJobResult {
     analysis: ReelAnalysis | null;
     error: string | null;
   }>;
-  /** Tier 2: refined scripts keyed by script index */
-  refinedScripts: Record<number, RefinedScript>;
+  /** Tier 2: refined scripts keyed by "{scriptIndex}_{humanizeMode}" */
+  refinedScripts: Record<string, RefinedScript>;
 }
 
 export type JobResult = ReelsJobResult | ScriptsJobResult;

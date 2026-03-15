@@ -112,6 +112,7 @@ export default function ScriptScorecardCard({
   const [refined, setRefined] = useState<RefinedScript | null>(cachedRefined ?? null);
   const [refining, setRefining] = useState(false);
   const [refineError, setRefineError] = useState<string | null>(null);
+  const [humanize, setHumanize] = useState<"auto" | "on" | "off">("auto");
 
   const handleRefine = useCallback(async () => {
     if (refined || refining) return;
@@ -122,7 +123,7 @@ export default function ScriptScorecardCard({
       const res = await fetch(`/api/jobs/${jobId}/refine`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptIndex: index }),
+        body: JSON.stringify({ scriptIndex: index, humanize }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -135,7 +136,7 @@ export default function ScriptScorecardCard({
     } finally {
       setRefining(false);
     }
-  }, [jobId, index, refined, refining]);
+  }, [jobId, index, refined, refining, humanize]);
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 overflow-hidden">
@@ -361,32 +362,58 @@ export default function ScriptScorecardCard({
             </div>
           )}
 
-          {/* Refine button + result */}
+          {/* Refine button + humanizer toggle + result */}
           <div className="border-t border-zinc-800 pt-4 mt-4">
             {!refined && (
-              <button
-                type="button"
-                onClick={handleRefine}
-                disabled={refining}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-3.5 text-sm font-semibold text-white transition hover:from-violet-500 hover:to-violet-400 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {refining ? (
-                  <>
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                    Refining script...
-                  </>
-                ) : (
-                  <>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Refine This Script
-                  </>
-                )}
-              </button>
+              <div className="space-y-3">
+                {/* Humanizer toggle */}
+                <div className="flex items-center justify-center gap-1 rounded-lg bg-zinc-800/50 p-1">
+                  {([
+                    { value: "auto", label: "Auto-detect" },
+                    { value: "on", label: "Humanize language" },
+                    { value: "off", label: "Keep my voice" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setHumanize(opt.value)}
+                      disabled={refining}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                        humanize === opt.value
+                          ? "bg-violet-600 text-white shadow-sm"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Refine button */}
+                <button
+                  type="button"
+                  onClick={handleRefine}
+                  disabled={refining}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-3.5 text-sm font-semibold text-white transition hover:from-violet-500 hover:to-violet-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {refining ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Refining script...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Refine This Script
+                    </>
+                  )}
+                </button>
+              </div>
             )}
 
             {refineError && (
