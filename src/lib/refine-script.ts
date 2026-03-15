@@ -97,15 +97,28 @@ function formatIssues(scorecard: ScriptScorecard): string {
 // Prompt: AI-detected script — enhance and humanize
 // ---------------------------------------------------------------------------
 
+function formatContext(
+  niche: string,
+  goal: string,
+  extra: { targetAudience?: string; tone?: string; offerDescription?: string }
+): string {
+  const lines = [`CONTEXT: ${niche} niche. Goal: ${goal}.`];
+  if (extra.targetAudience) lines.push(`Target audience: ${extra.targetAudience}.`);
+  if (extra.tone) lines.push(`Desired tone: ${extra.tone}.`);
+  if (extra.offerDescription) lines.push(`Product/offer: ${extra.offerDescription}.`);
+  return lines.join(" ");
+}
+
 function buildHumanizationPrompt(
   originalScript: string,
   scorecard: ScriptScorecard,
   niche: string,
-  goal: string
+  goal: string,
+  extra: { targetAudience?: string; tone?: string; offerDescription?: string }
 ): string {
   return `Enhance this script using your growth theory framework. The audit flagged it as AI-generated, so also make it sound natural and human.
 
-CONTEXT: ${niche} niche. Goal: ${goal}. Current score: ${scorecard.overallScore}/100.
+${formatContext(niche, goal, extra)} Current score: ${scorecard.overallScore}/100.
 
 ORIGINAL SCRIPT:
 ${originalScript}
@@ -138,11 +151,12 @@ function buildTargetedEditPrompt(
   originalScript: string,
   scorecard: ScriptScorecard,
   niche: string,
-  goal: string
+  goal: string,
+  extra: { targetAudience?: string; tone?: string; offerDescription?: string }
 ): string {
   return `Enhance this script using your growth theory framework. This script has authentic voice — preserve it while improving structure.
 
-CONTEXT: ${niche} niche. Goal: ${goal}. Current score: ${scorecard.overallScore}/100.
+${formatContext(niche, goal, extra)} Current score: ${scorecard.overallScore}/100.
 
 ORIGINAL SCRIPT:
 ${originalScript}
@@ -174,11 +188,12 @@ function buildConvergencePrompt(
   originalScript: string,
   scorecard: ScriptScorecard,
   niche: string,
-  goal: string
+  goal: string,
+  extra: { targetAudience?: string; tone?: string; offerDescription?: string }
 ): string {
   return `This is a strong script (${scorecard.overallScore}/100). Make only minor tweaks — do NOT rewrite or restructure it.
 
-CONTEXT: ${niche} niche. Goal: ${goal}.
+${formatContext(niche, goal, extra)}
 
 ORIGINAL SCRIPT:
 ${originalScript}
@@ -209,35 +224,36 @@ function selectPrompt(
   scorecard: ScriptScorecard,
   niche: string,
   goal: string,
+  extra: { targetAudience?: string; tone?: string; offerDescription?: string },
   humanize: HumanizeMode = "auto"
 ): string {
   // Convergence: script is already strong — minor tweaks only
   if (scorecard.overallScore >= 85) {
     console.log("[refine-script] Convergence mode — score is 85+, minor tweaks only");
-    return buildConvergencePrompt(originalScript, scorecard, niche, goal);
+    return buildConvergencePrompt(originalScript, scorecard, niche, goal, extra);
   }
 
   // Explicit humanize toggle overrides auto-detection
   if (humanize === "on") {
     console.log("[refine-script] Humanization mode — user toggled ON");
-    return buildHumanizationPrompt(originalScript, scorecard, niche, goal);
+    return buildHumanizationPrompt(originalScript, scorecard, niche, goal, extra);
   }
 
   if (humanize === "off") {
     console.log("[refine-script] Targeted edit mode — user toggled OFF (keep voice)");
-    return buildTargetedEditPrompt(originalScript, scorecard, niche, goal);
+    return buildTargetedEditPrompt(originalScript, scorecard, niche, goal, extra);
   }
 
   // Auto mode: use AI detection score to decide
   const aiRisk = scorecard.authenticityAssessment.aiDetectionRisk;
   if (aiRisk === "medium" || aiRisk === "high") {
     console.log(`[refine-script] Humanization mode — AI detection risk: ${aiRisk}`);
-    return buildHumanizationPrompt(originalScript, scorecard, niche, goal);
+    return buildHumanizationPrompt(originalScript, scorecard, niche, goal, extra);
   }
 
   // Human-detected: targeted structural improvements
   console.log("[refine-script] Targeted edit mode — script sounds human, structural fixes only");
-  return buildTargetedEditPrompt(originalScript, scorecard, niche, goal);
+  return buildTargetedEditPrompt(originalScript, scorecard, niche, goal, extra);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,16 +271,20 @@ export async function refineScript(
   scorecard: ScriptScorecard,
   niche: string,
   goal: string,
-  humanize: HumanizeMode = "auto"
+  context: { targetAudience?: string; tone?: string; offerDescription?: string } = {},
+  humanize: HumanizeMode = "auto",
+  version: number = 0
 ): Promise<RefineResult> {
   const client = getClient();
-  const userPrompt = selectPrompt(originalScript, scorecard, niche, goal, humanize);
+  const userPrompt = selectPrompt(originalScript, scorecard, niche, goal, context, humanize);
+  const temp = version > 0 ? 0.3 : 0;
 
   // First attempt
-  let raw = await callSonnet(client, userPrompt);
+  let raw = await callSonnet(client, userPrompt, temp);
   let parsed = tryParseJson<RefinedScript>(raw);
 
   if (parsed) {
+    parsed.refinedContent = await cleanupHype(parsed.refinedContent, client);
     return { refined: parsed, error: null, retried: false };
   }
 
@@ -275,10 +295,11 @@ export async function refineScript(
     userPrompt +
     "\n\nYou previously returned invalid JSON. Return ONLY the JSON object, nothing else.";
 
-  raw = await callSonnet(client, retryPrompt);
+  raw = await callSonnet(client, retryPrompt, temp);
   parsed = tryParseJson<RefinedScript>(raw);
 
   if (parsed) {
+    parsed.refinedContent = await cleanupHype(parsed.refinedContent, client);
     return { refined: parsed, error: null, retried: true };
   }
 
@@ -290,14 +311,62 @@ export async function refineScript(
 }
 
 // ---------------------------------------------------------------------------
+// Post-refinement cleanup — catches hype/salesy language that slips through
+// ---------------------------------------------------------------------------
+
+async function cleanupHype(
+  refinedContent: string,
+  client: Anthropic
+): Promise<string> {
+  try {
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20241022",
+      max_tokens: 2048,
+      temperature: 0,
+      messages: [
+        {
+          role: "user",
+          content: `Review this script for hype/salesy language and fix it. Return ONLY the cleaned script text, nothing else.
+
+RULES:
+- Replace hype phrases with plain, confident language (e.g. "level up" → "get better", "LOADED" → "packed with")
+- Replace ALL-CAPS emphasis words with normal casing
+- Replace "about to level up" / "game changer" / "you're not ready" type phrases with straightforward statements
+- Don't dump all value upfront — if the script reveals everything in the first half, restructure so details unfold progressively
+- Keep the same length, structure, and meaning — only change tone where it sounds like an ad
+- If the script is already clean, return it exactly as-is
+
+SCRIPT:
+${refinedContent}`,
+        },
+      ],
+    });
+
+    const block = response.content[0];
+    if (block.type !== "text") return refinedContent;
+    const cleaned = block.text.trim();
+    // Sanity check: if Haiku returned something wildly different in length, skip
+    if (cleaned.length < refinedContent.length * 0.5 || cleaned.length > refinedContent.length * 2) {
+      console.log("[refine-script] Cleanup pass returned unexpected length, skipping");
+      return refinedContent;
+    }
+    return cleaned;
+  } catch (err) {
+    // Non-critical — if cleanup fails, return the original refinement
+    console.error("[refine-script] Cleanup pass failed, skipping:", (err as Error).message);
+    return refinedContent;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Sonnet API call
 // ---------------------------------------------------------------------------
 
-async function callSonnet(client: Anthropic, userPrompt: string): Promise<string> {
+async function callSonnet(client: Anthropic, userPrompt: string, temperature = 0): Promise<string> {
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 4096,
-    temperature: 0,
+    temperature,
     system: THEORY_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });

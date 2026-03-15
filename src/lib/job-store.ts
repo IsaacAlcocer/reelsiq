@@ -68,6 +68,12 @@ export interface Job {
   scripts: ScriptInput[];
   niche: string;
   goal: string;
+  /** Script Lab only — who the content is for */
+  targetAudience: string;
+  /** Script Lab only — desired voice (casual/professional/hype/storytelling) */
+  tone: string;
+  /** Script Lab only — what the creator is selling/promoting */
+  offerDescription: string;
   depth: "quick" | "deep";
   status: JobStage;
   progress: JobProgress;
@@ -107,6 +113,9 @@ export function createJob(params: {
   scripts?: ScriptInput[];
   niche: string;
   goal: string;
+  targetAudience?: string;
+  tone?: string;
+  offerDescription?: string;
   depth?: "quick" | "deep";
 }): Job {
   const id = generateId();
@@ -121,6 +130,9 @@ export function createJob(params: {
     scripts: params.scripts ?? [],
     niche: params.niche,
     goal: params.goal,
+    targetAudience: params.targetAudience ?? "",
+    tone: params.tone ?? "",
+    offerDescription: params.offerDescription ?? "",
     depth: params.depth ?? "quick",
     status: initialStage,
     progress: {

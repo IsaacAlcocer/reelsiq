@@ -61,6 +61,9 @@ export async function POST(req: NextRequest) {
       scripts: validation.scripts,
       niche: (body.niche as string).trim(),
       goal: (body.goal as string).trim(),
+      targetAudience: ((body.targetAudience as string) ?? "").trim(),
+      tone: ((body.tone as string) ?? "").trim(),
+      offerDescription: ((body.offerDescription as string) ?? "").trim(),
     });
 
     // Fire and forget

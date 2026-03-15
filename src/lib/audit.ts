@@ -37,15 +37,21 @@ function buildAuditPrompt(
   analyses: Array<{ title: string; script: string; analysis: ReelAnalysis }>,
   niche: string,
   goal: string,
+  context: { targetAudience?: string; tone?: string; offerDescription?: string },
   benchmarkContext: string | null
 ): string {
   const benchmarkBlock = benchmarkContext
     ? `\n${benchmarkContext}\n`
     : "";
 
+  const contextLines = [`The creator writes in the ${niche} niche. Their goal is: ${goal}`];
+  if (context.targetAudience) contextLines.push(`Target audience: ${context.targetAudience}`);
+  if (context.tone) contextLines.push(`Desired tone: ${context.tone}`);
+  if (context.offerDescription) contextLines.push(`Product/offer being promoted: ${context.offerDescription}`);
+
   return `You are a content strategist auditing user-written scripts against growth principles. Your job is to help this creator find their own formula — not match a checklist.
 
-The creator writes in the ${niche} niche. Their goal is: ${goal}
+${contextLines.join("\n")}
 ${benchmarkBlock}
 Below are ${analyses.length} script(s) the creator plans to use for Instagram Reels, along with their structural analyses.
 
@@ -151,7 +157,8 @@ export interface AuditSynthesisResult {
 export async function auditScripts(
   analyses: Array<{ title: string; script: string; analysis: ReelAnalysis }>,
   niche: string,
-  goal: string
+  goal: string,
+  context: { targetAudience?: string; tone?: string; offerDescription?: string } = {}
 ): Promise<AuditSynthesisResult> {
   if (analyses.length === 0) {
     return { auditResult: null, error: "No analyses to audit", retried: false };
@@ -168,7 +175,7 @@ export async function auditScripts(
     // Non-critical — proceed without benchmarks
   }
 
-  const userPrompt = buildAuditPrompt(analyses, niche, goal, benchmarkContext);
+  const userPrompt = buildAuditPrompt(analyses, niche, goal, context, benchmarkContext);
 
   // First attempt
   let raw = await callSonnet(client, userPrompt);

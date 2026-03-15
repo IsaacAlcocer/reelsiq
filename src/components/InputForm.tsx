@@ -8,7 +8,14 @@ const INSTAGRAM_REEL_RE =
 const HANDLE_RE = /^@?[\w.]{1,30}$/;
 
 type InputMode = "urls" | "handles" | "scripts";
-type Goal = "Grow following" | "Generate leads" | "Build brand awareness";
+type Goal =
+  | "Grow followers"
+  | "Get DMs & leads"
+  | "Sell a product"
+  | "Build authority"
+  | "Drive traffic"
+  | "Build brand awareness";
+type Tone = "" | "casual" | "professional" | "hype" | "storytelling";
 type Depth = "quick" | "deep";
 
 interface ScriptEntry {
@@ -26,7 +33,10 @@ export default function InputForm() {
     { title: "", content: "" },
   ]);
   const [niche, setNiche] = useState("");
-  const [goal, setGoal] = useState<Goal>("Grow following");
+  const [goal, setGoal] = useState<Goal>("Grow followers");
+  const [targetAudience, setTargetAudience] = useState("");
+  const [tone, setTone] = useState<Tone>("");
+  const [offerDescription, setOfferDescription] = useState("");
   const [depth, setDepth] = useState<Depth>("quick");
 
   const [errors, setErrors] = useState<string[]>([]);
@@ -184,6 +194,9 @@ export default function InputForm() {
       } else {
         body.jobType = "scripts";
         body.scripts = v.scripts;
+        if (targetAudience.trim()) body.targetAudience = targetAudience.trim();
+        if (tone) body.tone = tone;
+        if (offerDescription.trim()) body.offerDescription = offerDescription.trim();
       }
 
       const res = await fetch("/api/jobs", {
@@ -390,11 +403,68 @@ export default function InputForm() {
           onChange={(e) => setGoal(e.target.value as Goal)}
           className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
         >
-          <option>Grow following</option>
-          <option>Generate leads</option>
+          <option>Grow followers</option>
+          <option>Get DMs &amp; leads</option>
+          <option>Sell a product</option>
+          <option>Build authority</option>
+          <option>Drive traffic</option>
           <option>Build brand awareness</option>
         </select>
       </div>
+
+      {/* Script Lab extras */}
+      {mode === "scripts" && (
+        <>
+          {/* Target Audience */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+              Target Audience{" "}
+              <span className="text-zinc-500">(optional)</span>
+            </label>
+            <input
+              type="text"
+              placeholder='e.g. "beginner video editors aged 18-25"'
+              value={targetAudience}
+              onChange={(e) => setTargetAudience(e.target.value)}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            />
+          </div>
+
+          {/* Tone */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+              Tone / Voice{" "}
+              <span className="text-zinc-500">(optional)</span>
+            </label>
+            <select
+              value={tone}
+              onChange={(e) => setTone(e.target.value as Tone)}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            >
+              <option value="">Auto-detect from script</option>
+              <option value="casual">Casual &amp; conversational</option>
+              <option value="professional">Professional &amp; polished</option>
+              <option value="hype">High-energy &amp; hype</option>
+              <option value="storytelling">Storytelling &amp; narrative</option>
+            </select>
+          </div>
+
+          {/* Offer / Product Description */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+              What are you promoting?{" "}
+              <span className="text-zinc-500">(optional)</span>
+            </label>
+            <textarea
+              rows={2}
+              placeholder='e.g. "A clip pack with 500+ cinematic shots, b-roll, and movie clips organized by vibe — $29 one-time"'
+              value={offerDescription}
+              onChange={(e) => setOfferDescription(e.target.value)}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            />
+          </div>
+        </>
+      )}
 
       {/* Depth toggle (only for reels mode) */}
       {mode !== "scripts" && (

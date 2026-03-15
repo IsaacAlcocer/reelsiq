@@ -109,13 +109,15 @@ export default function ScriptScorecardCard({
   cachedRefined?: RefinedScript | null;
 }) {
   const [expanded, setExpanded] = useState(index === 0);
+  const MAX_VERSIONS = 3;
   const [refined, setRefined] = useState<RefinedScript | null>(cachedRefined ?? null);
   const [refining, setRefining] = useState(false);
   const [refineError, setRefineError] = useState<string | null>(null);
   const [humanize, setHumanize] = useState<"auto" | "on" | "off">("auto");
+  const [version, setVersion] = useState(0);
 
   const handleRefine = useCallback(async () => {
-    if (refined || refining) return;
+    if (refining) return;
     setRefining(true);
     setRefineError(null);
 
@@ -123,7 +125,7 @@ export default function ScriptScorecardCard({
       const res = await fetch(`/api/jobs/${jobId}/refine`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptIndex: index, humanize }),
+        body: JSON.stringify({ scriptIndex: index, humanize, version }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -136,7 +138,13 @@ export default function ScriptScorecardCard({
     } finally {
       setRefining(false);
     }
-  }, [jobId, index, refined, refining, humanize]);
+  }, [jobId, index, refining, humanize, version]);
+
+  const handleReRefine = useCallback(() => {
+    setVersion((v) => v + 1);
+    setRefined(null);
+    setRefineError(null);
+  }, []);
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 overflow-hidden">
@@ -423,10 +431,52 @@ export default function ScriptScorecardCard({
             )}
 
             {refined && (
-              <RefinedScriptView
-                refined={refined}
-                originalScore={scorecard.overallScore}
-              />
+              <>
+                <RefinedScriptView
+                  refined={refined}
+                  originalScore={scorecard.overallScore}
+                />
+
+                {/* Try a different refinement */}
+                {version + 1 < MAX_VERSIONS && (
+                  <div className="mt-4 space-y-3">
+                    {/* Humanizer toggle for re-refinement */}
+                    <div className="flex items-center justify-center gap-1 rounded-lg bg-zinc-800/50 p-1">
+                      {([
+                        { value: "auto", label: "Auto-detect" },
+                        { value: "on", label: "Humanize language" },
+                        { value: "off", label: "Keep my voice" },
+                      ] as const).map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setHumanize(opt.value)}
+                          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                            humanize === opt.value
+                              ? "bg-violet-600 text-white shadow-sm"
+                              : "text-zinc-400 hover:text-zinc-200"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleReRefine}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-500/30 px-6 py-3 text-sm font-medium text-violet-400 transition hover:bg-violet-500/10 hover:border-violet-500/50"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Try a Different Refinement
+                      <span className="text-xs text-zinc-500">
+                        ({MAX_VERSIONS - version - 1} left)
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

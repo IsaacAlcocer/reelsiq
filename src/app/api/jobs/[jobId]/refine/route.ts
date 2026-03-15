@@ -25,7 +25,9 @@ export async function POST(
     );
   }
 
-  let body: { scriptIndex?: number; humanize?: string };
+  const MAX_REFINEMENT_VERSIONS = 3;
+
+  let body: { scriptIndex?: number; humanize?: string; version?: number };
   try {
     body = await req.json();
   } catch {
@@ -46,6 +48,14 @@ export async function POST(
   const humanize: HumanizeMode =
     body.humanize === "on" || body.humanize === "off" ? body.humanize : "auto";
 
+  const version = typeof body.version === "number" ? Math.max(0, Math.floor(body.version)) : 0;
+  if (version >= MAX_REFINEMENT_VERSIONS) {
+    return NextResponse.json(
+      { error: `Maximum ${MAX_REFINEMENT_VERSIONS} refinement attempts reached for this mode.` },
+      { status: 400 }
+    );
+  }
+
   if (scriptIndex >= job.scripts.length) {
     return NextResponse.json(
       { error: `scriptIndex ${scriptIndex} is out of range.` },
@@ -54,7 +64,7 @@ export async function POST(
   }
 
   const result = job.result as ScriptsJobResult;
-  const cacheKey = `${scriptIndex}_${humanize}`;
+  const cacheKey = `${scriptIndex}_${humanize}_v${version}`;
 
   // Return cached result if already refined with same humanize mode
   if (result.refinedScripts[cacheKey]) {
@@ -82,7 +92,13 @@ export async function POST(
       scorecard,
       job.niche,
       job.goal,
-      humanize
+      {
+        targetAudience: job.targetAudience,
+        tone: job.tone,
+        offerDescription: job.offerDescription,
+      },
+      humanize,
+      version
     );
 
     if (!refineResult.refined) {

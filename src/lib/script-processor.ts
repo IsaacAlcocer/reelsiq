@@ -121,7 +121,12 @@ export async function processScriptJob(job: Job): Promise<void> {
     const auditResult = await auditScripts(
       successfulAnalyses,
       job.niche,
-      job.goal
+      job.goal,
+      {
+        targetAudience: job.targetAudience,
+        tone: job.tone,
+        offerDescription: job.offerDescription,
+      }
     );
 
     if (!auditResult.auditResult) {
