@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:apify": "tsx scripts/test-apify.ts",
+    "test:scraper": "tsx scripts/test-scraper.ts",
     "test:transcribe": "tsx scripts/test-transcribe.ts",
     "test:analyze": "tsx scripts/test-analyze.ts",
     "test:synthesize": "tsx scripts/test-synthesize.ts"

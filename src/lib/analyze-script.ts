@@ -1,110 +1,11 @@
+// ---------------------------------------------------------------------------
+// Per-Script Analysis — adapted from analyze.ts for user-provided scripts
+// No video metadata (views, likes, etc.) — pure transcript analysis.
+// ---------------------------------------------------------------------------
+
 import Anthropic from "@anthropic-ai/sdk";
-import type { ScrapedReel } from "./scraper";
-import type { TranscriptResult } from "./transcribe";
+import type { ReelAnalysis } from "./analyze";
 import { tryParseJson } from "./parse-json";
-
-// ---------------------------------------------------------------------------
-// Types — Per-Reel Extraction Schema (Section 6, 23 fields)
-// ---------------------------------------------------------------------------
-
-export interface BrainTriggerTrifecta {
-  textHookPresent: boolean;
-  spokenHookPresent: boolean;
-  visualContextClue: string | null;
-}
-
-export interface ReelAnalysis {
-  hookCategory:
-    | "question"
-    | "contradiction"
-    | "bold_claim"
-    | "curiosity_gap"
-    | "personal_story"
-    | "controversial"
-    | "direct_address"
-    | "visual_implied";
-  hookText: string;
-  hookWordCount: number;
-  hookDurationEstimate: "0-2s" | "0-3s" | "0-4s";
-
-  hookClarity: "strong" | "weak" | "absent";
-  hookClarityNote: string;
-  hookCuriosityGap: "strong" | "weak" | "absent";
-  hookCuriosityGapNote: string;
-  brainTriggerTrifecta: BrainTriggerTrifecta;
-
-  narrativeType:
-    | "problem_solution"
-    | "before_after"
-    | "numbered_list"
-    | "story_arc"
-    | "how_to"
-    | "rant"
-    | "case_study"
-    | "myth_bust";
-  packagingFramework:
-    | "comparison_ab"
-    | "contrarian_gap"
-    | "tastemaker_curation"
-    | "recipe_steps"
-    | "payoff_delay"
-    | "trial_reel_ad"
-    | "raw_unpackaged"
-    | "other";
-  packagingNote: string;
-
-  tensionMechanism: string;
-  openLoop: boolean;
-  openLoopText: string | null;
-
-  payoffPosition:
-    | "early_third"
-    | "middle_third"
-    | "final_third"
-    | "no_clear_payoff";
-  payoffNote: string;
-
-  rhetoricalInterrupts: number;
-  rhetoricalInterruptExamples: string[];
-
-  vocabularyLevel:
-    | "simple_punchy"
-    | "conversational"
-    | "technical_authoritative";
-  sentenceRhythm: "rapid_fire" | "measured_deliberate" | "building_momentum";
-  emotionalCore:
-    | "inspiration"
-    | "curiosity"
-    | "fear_of_missing_out"
-    | "relatability"
-    | "aspiration"
-    | "frustration_relief"
-    | "shock"
-    | "validation";
-
-  ctaStyle: "soft" | "direct" | "embedded" | "none";
-  ctaText: string | null;
-  sessionBehavior:
-    | "profile_driver"
-    | "external_link"
-    | "engagement_prompt"
-    | "series_reference"
-    | "no_cta";
-  sessionNote: string;
-
-  scriptLength: "short" | "medium" | "long";
-  estimatedWordCount: number;
-  durationBucket:
-    | "under_15s"
-    | "15_30s"
-    | "30_60s"
-    | "60_90s"
-    | "90_120s"
-    | "over_120s";
-
-  keyPhrases: string[];
-  transferableInsight: string;
-}
 
 // ---------------------------------------------------------------------------
 // Anthropic client (lazy singleton)
@@ -125,28 +26,19 @@ function getClient(): Anthropic {
 }
 
 // ---------------------------------------------------------------------------
-// Prompt builder
+// Prompt builder — no video metadata, pure script analysis
 // ---------------------------------------------------------------------------
 
-function buildPrompt(
-  transcript: string,
-  reel: ScrapedReel
-): string {
-  return `You are an expert viral content analyst specializing in short-form video.
+function buildScriptPrompt(script: string, title: string): string {
+  return `You are an expert viral content analyst specializing in short-form video scripts for Instagram Reels.
 
-Analyze this Instagram Reel transcript and extract a structured breakdown.
+Analyze this user-written script and extract a structured breakdown. This is a script the creator plans to use — there is no video metadata available.
 Return ONLY valid JSON. No markdown fences, no preamble, no explanation.
 
-TRANSCRIPT:
-${transcript}
+SCRIPT TITLE: ${title}
 
-VIDEO METADATA:
-- Views: ${reel.viewCount ?? "unknown"}
-- Likes: ${reel.likeCount ?? "unknown"}
-- Shares: ${reel.shareCount ?? "unknown"}
-- Account followers: ${reel.followerCount ?? "unknown"}
-- Caption: ${reel.caption ?? "none"}
-- Duration: ${reel.durationSeconds ?? "unknown"}s
+SCRIPT:
+${script}
 
 Return this exact JSON structure:
 {
@@ -162,7 +54,7 @@ Return this exact JSON structure:
   "brainTriggerTrifecta": {
     "textHookPresent": true | false,
     "spokenHookPresent": true | false,
-    "visualContextClue": "description of the implied visual setting/context if detectable from transcript, or null"
+    "visualContextClue": "description of the implied visual setting/context if detectable from script, or null"
   },
 
   "narrativeType": one of: "problem_solution" | "before_after" | "numbered_list" | "story_arc" | "how_to" | "rant" | "case_study" | "myth_bust",
@@ -198,29 +90,29 @@ Return this exact JSON structure:
 }
 
 // ---------------------------------------------------------------------------
-// Main: analyze a single reel
+// Main: analyze a single user script
 // ---------------------------------------------------------------------------
 
-export interface AnalyzeResult {
+export interface ScriptAnalyzeResult {
   analysis: ReelAnalysis | null;
   error: string | null;
   retried: boolean;
 }
 
-export async function analyzeReel(
-  reel: ScrapedReel,
-  transcript: TranscriptResult
-): Promise<AnalyzeResult> {
-  if (!transcript.transcript || transcript.visualOnly) {
+export async function analyzeScript(
+  script: string,
+  title: string
+): Promise<ScriptAnalyzeResult> {
+  if (!script || script.trim().length === 0) {
     return {
       analysis: null,
-      error: "visual-only or no transcript",
+      error: "Empty script",
       retried: false,
     };
   }
 
   const client = getClient();
-  const prompt = buildPrompt(transcript.transcript, reel);
+  const prompt = buildScriptPrompt(script, title);
 
   // First attempt
   let raw = await callClaude(client, prompt);
@@ -230,9 +122,9 @@ export async function analyzeReel(
     return { analysis: parsed, error: null, retried: false };
   }
 
-  // Step 4 from Section 11: retry with stricter instruction
+  // Retry with stricter instruction
   console.log(
-    `[analyze] JSON parse failed for ${reel.url}, retrying with stricter prompt...`
+    `[analyze-script] JSON parse failed for "${title}", retrying with stricter prompt...`
   );
 
   const retryPrompt =
@@ -246,7 +138,6 @@ export async function analyzeReel(
     return { analysis: parsed, error: null, retried: true };
   }
 
-  // Step 5: give up
   return {
     analysis: null,
     error: `Failed to parse JSON after retry. Raw response: ${raw.slice(0, 200)}`,

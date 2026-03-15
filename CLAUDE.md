@@ -8,31 +8,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev              # Start Next.js dev server (localhost:3000)
 npm run build            # Production build
 npm run lint             # ESLint (next/core-web-vitals + next/typescript)
-npm run test:apify       # Test Apify scraping (3 default reels)
+npm run test:scraper     # Test Instagram scraping (3 default reels)
 npm run test:transcribe  # Test transcription pipeline (5 reels)
 npm run test:analyze     # Test per-reel analysis: npm run test:analyze [url1] [url2]
 npm run test:synthesize  # Test full pipeline: npm run test:synthesize [url1] [url2]
 ```
 
-There is no unit test suite. The `test:*` scripts are integration tests that hit live APIs (Apify, Groq, Anthropic) and require `.env` credentials.
+There is no unit test suite. The `test:*` scripts are integration tests that hit live APIs (yt-dlp/Instagram, Groq, Anthropic) and require `.env` credentials + yt-dlp installed.
 
 ## Architecture
 
-ReelsIQ is a Next.js 14 App Router application that bulk-analyzes Instagram Reels through a four-phase AI pipeline and produces a "Formula Card" — a 13-section playbook grounded in Instagram growth theory.
+ReelsIQ is a Next.js 14 App Router application with two modes:
+
+1. **Reel Analysis** — Bulk-analyzes Instagram Reels through a four-phase AI pipeline and produces a "Formula Card" (13-section playbook grounded in Instagram growth theory).
+2. **Script Lab** — Users paste their own scripts, which get audited against the growth theory framework. Produces per-script scorecards with grades, issues, and refined openings.
 
 ### Processing Pipeline (src/lib/job-processor.ts)
 
 Jobs flow through four sequential phases, each with its own concurrency limit:
 
-1. **Scrape** (1 batch call) — Apify fetches all reel metadata + transcripts in a single actor run. When handles are provided, reels are sorted by views and top N selected (quick=10, deep=25).
+1. **Scrape** — yt-dlp (default, free) or Apify (paid, for production). yt-dlp fetches reel metadata + audio URLs, then Instagram's GraphQL API enriches with view counts, play counts, and follower counts. When handles are provided, reels are sorted by views and top N selected (quick=10, deep=25). Backend selected via `SCRAPER_BACKEND` env var (default: `ytdlp`).
 
-2. **Transcribe** (5 concurrent) — Quality gate: if Apify transcript ≥30 words, use it directly. Otherwise download video → ffmpeg extract audio → Groq Whisper. Reels with <20 words after all attempts are flagged "visual-only" and skipped.
+2. **Transcribe** (5 concurrent) — Quality gate: if scraped transcript ≥30 words, use it directly. Otherwise download video → ffmpeg extract audio → Groq Whisper. Reels with <20 words after all attempts are flagged "visual-only" and skipped.
 
 3. **Analyze** (10 concurrent) — Claude Haiku extracts a 23-field structured JSON (`ReelAnalysis`) from each transcript. No theory system prompt at this stage — purely structural extraction.
 
 4. **Synthesize** (1 call) — Claude Sonnet receives all `ReelAnalysis` objects with `THEORY_SYSTEM_PROMPT` (from `src/lib/theory-prompt.ts`) as the system message. Produces the `FormulaCard` by evaluating cross-reel patterns against the growth theory framework.
 
 Concurrency is managed by a `runWithConcurrency` helper (worker pool pattern with shared index counter in job-processor.ts). Each phase validates it has enough data to continue — if zero usable reels survive any gate, the job errors gracefully.
+
+### Script Lab Pipeline (src/lib/script-processor.ts)
+
+Script jobs skip scrape and transcribe entirely — the user provides scripts as text:
+
+1. **Analyze** (10 concurrent) — `analyze-script.ts` runs each script through Haiku with an adapted prompt (no video metadata). Produces the same 23-field `ReelAnalysis` schema.
+
+2. **Audit** (1 call) — `audit.ts` sends all analyses + original script texts to Sonnet with the theory system prompt. Produces a `ScriptAuditResult` containing per-script `ScriptScorecard`s (overall score, hook/packaging/retention/authenticity assessments, issues list, refined opening) plus cross-script patterns.
+
+Job type is distinguished by `job.jobType: "reels" | "scripts"`. The API route dispatches to either `processJob` or `processScriptJob`.
+
+### Script Refiner — Tier 2 (src/lib/refine-script.ts)
+
+After viewing their scorecard, users can click "Refine This Script" on any individual scorecard. This triggers an on-demand Sonnet call (`POST /api/jobs/[jobId]/refine` with `{ scriptIndex }`) that:
+
+1. Takes the original script + its scorecard feedback + theory prompt
+2. Rewrites the entire script addressing all identified issues
+3. Returns a `RefinedScript` with: the full rewritten script, a changelog of specific changes with growth-theory reasoning, hook before/after comparison, estimated score improvement, and a summary
+
+Refined scripts are cached on the job's `refinedScripts` map (keyed by script index) so subsequent requests for the same script return instantly. The UI shows score improvement, hook comparison, the copyable refined script, and a collapsible changes log.
 
 ### State & Polling
 
@@ -66,7 +89,15 @@ The FormulaCard has 13 sections, each rendered by a dedicated component in `src/
 | `src/lib/synthesize.ts` | Cross-reel Sonnet synthesis (FormulaCard output) |
 | `src/lib/parse-json.ts` | 4-step JSON parsing fallback |
 | `src/lib/job-store.ts` | In-memory job store with TTL |
-| `src/lib/apify.ts` | Apify actor integration |
+| `src/lib/analyze-script.ts` | Per-script Haiku extraction (adapted prompt, no metadata) |
+| `src/lib/audit.ts` | Script audit Sonnet synthesis (ScriptScorecard output) |
+| `src/lib/script-processor.ts` | Script Lab pipeline orchestrator |
+| `src/lib/refine-script.ts` | On-demand Sonnet script rewriter (Tier 2) |
+| `src/types/script-audit.ts` | TypeScript interfaces for Script Lab + Refiner |
+| `src/lib/scraper/index.ts` | Scraper dispatcher (yt-dlp default, Apify optional) |
+| `src/lib/scraper/ytdlp.ts` | Free yt-dlp + GraphQL insights scraper backend |
+| `src/lib/scraper/apify.ts` | Paid Apify scraper backend (for production) |
+| `src/lib/scraper/types.ts` | ScrapedReel interface shared by both backends |
 | `src/lib/transcribe.ts` | Transcript quality gate + Groq Whisper fallback |
 | `src/lib/rate-limit.ts` | Per-IP rate limiting (10/hr) + kill switch |
 | `src/lib/validators.ts` | Input validation (URLs, handles, niche, goal) |
@@ -77,6 +108,7 @@ The FormulaCard has 13 sections, each rendered by a dedicated component in `src/
 - **Path alias**: `@/*` maps to `./src/*`
 - **TypeScript**: Strict mode enabled
 - **ESLint**: Extends `next/core-web-vitals` and `next/typescript`
-- **next.config.mjs**: `apify-client` externalized from server bundle
+- **next.config.mjs**: `apify-client` externalized from server bundle (only used when SCRAPER_BACKEND=apify)
+- **yt-dlp**: Required system dependency for default scraper backend
 - **ffmpeg**: Required system dependency for audio extraction
-- **Environment**: `APIFY_API_TOKEN`, `GROQ_API_KEY`, `ANTHROPIC_API_KEY` in `.env`. Optional `REELSIQ_KILL_SWITCH=1` to block new jobs.
+- **Environment**: `GROQ_API_KEY`, `ANTHROPIC_API_KEY` in `.env`. Optional: `SCRAPER_BACKEND=apify` + `APIFY_API_TOKEN` for paid backend, `INSTAGRAM_COOKIES_BROWSER` (default: `firefox`), `INSTAGRAM_COOKIES_FILE`, `YTDLP_CONCURRENCY` (default: 3), `YTDLP_DELAY_MS` (default: 1000). `REELSIQ_KILL_SWITCH=1` to block new jobs.

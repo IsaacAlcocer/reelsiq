@@ -8,11 +8,11 @@
  *   npx tsx scripts/test-synthesize.ts
  *   npx tsx scripts/test-synthesize.ts url1 url2 url3 url4 url5
  *
- * Requires APIFY_API_TOKEN, GROQ_API_KEY, and ANTHROPIC_API_KEY in .env
+ * Requires GROQ_API_KEY and ANTHROPIC_API_KEY in .env, yt-dlp installed
  */
 
 import "dotenv/config";
-import { scrapeReels } from "../src/lib/apify";
+import { scrapeReels } from "../src/lib/scraper";
 import { ensureTranscripts } from "../src/lib/transcribe";
 import { analyzeReel, type ReelAnalysis } from "../src/lib/analyze";
 import { synthesize } from "../src/lib/synthesize";
@@ -37,7 +37,7 @@ async function main() {
   console.log(`Reels: ${urls.length}\n`);
 
   // Step 1: Scrape
-  console.log("--- Step 1: Scraping with Apify ---");
+  console.log("--- Step 1: Scraping ---");
   const startScrape = Date.now();
   const reels = await scrapeReels(urls);
   console.log(
@@ -45,7 +45,7 @@ async function main() {
   );
 
   if (reels.length === 0) {
-    console.error("No results from Apify.");
+    console.error("No results from scraper.");
     process.exit(1);
   }
 

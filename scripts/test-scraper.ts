@@ -1,29 +1,34 @@
 /**
- * Test script for the Apify Instagram Reel Scraper integration.
+ * Test script for the Instagram Reel Scraper integration.
  *
  * Usage:
- *   npx tsx scripts/test-apify.ts
+ *   npx tsx scripts/test-scraper.ts
+ *   npx tsx scripts/test-scraper.ts url1 url2 url3
  *
- * Requires APIFY_API_TOKEN in .env (or exported in your shell).
+ * Default backend: yt-dlp (free). Set SCRAPER_BACKEND=apify for Apify.
+ * Requires yt-dlp installed and Instagram cookies in Firefox.
  */
 
 import "dotenv/config";
-import { scrapeReels } from "../src/lib/apify";
+import { scrapeReels } from "../src/lib/scraper";
 
-const TEST_URLS = [
+const DEFAULT_URLS = [
   "https://www.instagram.com/p/DUWFvpHDFP4/",
   "https://www.instagram.com/p/DTtqi4Sj_Jc/",
   "https://www.instagram.com/p/DSdAxQfia6c/",
 ];
 
 async function main() {
-  console.log("=== ReelsIQ — Apify Integration Test ===\n");
-  console.log(`Testing with ${TEST_URLS.length} Reel URL(s):\n`);
-  TEST_URLS.forEach((u, i) => console.log(`  ${i + 1}. ${u}`));
+  const urls = process.argv.length > 2 ? process.argv.slice(2) : DEFAULT_URLS;
+  const backend = process.env.SCRAPER_BACKEND || "ytdlp";
+
+  console.log(`=== ReelsIQ — Scraper Integration Test (${backend}) ===\n`);
+  console.log(`Testing with ${urls.length} Reel URL(s):\n`);
+  urls.forEach((u, i) => console.log(`  ${i + 1}. ${u}`));
   console.log();
 
   const startTime = Date.now();
-  const results = await scrapeReels(TEST_URLS);
+  const results = await scrapeReels(urls);
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
   console.log(`\n=== Results (${results.length} reels, ${elapsed}s) ===\n`);
@@ -54,6 +59,7 @@ async function main() {
   const needsWhisper = results.filter((r) => !r.hasUsableTranscript).length;
 
   console.log("=== Summary ===");
+  console.log(`Backend:                   ${backend}`);
   console.log(`Total reels scraped:       ${results.length}`);
   console.log(`With usable transcript:    ${withTranscript}`);
   console.log(`Needs Whisper fallback:    ${needsWhisper}`);

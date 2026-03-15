@@ -4,6 +4,8 @@ A theory-enhanced Instagram Reels analysis engine that extracts viral content pa
 
 ReelsIQ is not a metrics dashboard. It explains **why** content works at the script and structure level, evaluated against Instagram's 2026 algorithm mechanics, hook psychology, retention science, and content architecture.
 
+Two modes: **Reel Analysis** reverse-engineers top-performing content into a 13-section Formula Card playbook. **Script Lab** audits your own scripts against the same theory framework and can rewrite them with an adaptive AI refiner.
+
 ---
 
 ## Table of Contents
@@ -17,6 +19,11 @@ ReelsIQ is not a metrics dashboard. It explains **why** content works at the scr
   - [Viewing Results](#viewing-results)
   - [Exporting Results](#exporting-results)
 - [Understanding the Formula Card](#understanding-the-formula-card)
+- [Script Lab](#script-lab)
+  - [Script Audit](#script-audit)
+  - [Script Refiner](#script-refiner)
+  - [Humanizer Toggle](#humanizer-toggle)
+  - [Social Media Lexicon](#social-media-lexicon)
 - [The Theory Engine](#the-theory-engine)
 - [API Reference](#api-reference)
 - [Testing Scripts](#testing-scripts)
@@ -28,12 +35,14 @@ ReelsIQ is not a metrics dashboard. It explains **why** content works at the scr
 
 ## How It Works
 
+### Reel Analysis Pipeline
+
 ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 
 ```
-1. SCRAPING        Apify fetches video metadata and transcripts from Instagram
+1. SCRAPING        yt-dlp fetches video metadata from Instagram, GraphQL enriches with insights
          |
-2. TRANSCRIBING    Groq Whisper fills in missing/short transcripts from audio
+2. TRANSCRIBING    Groq Whisper transcribes audio extracted from reel videos
          |
 3. ANALYZING       Claude Haiku extracts 23 structured fields per reel
          |
@@ -42,15 +51,37 @@ ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 5. FORMULA CARD    A 13-section playbook: hooks, packaging, retention, voice, deployment plan
 ```
 
-**Stage 1 - Scraping:** A single Apify call (`apify/instagram-reel-scraper`) fetches all target reels in one batch. When handles are provided instead of URLs, it pulls recent reels and ranks them by view count, taking the top N based on analysis depth.
+**Stage 1 - Scraping:** yt-dlp (free, open-source) fetches reel metadata and audio URLs, then Instagram's GraphQL API enriches each reel with view counts, play counts, and follower counts. When handles are provided instead of URLs, yt-dlp lists their recent reels, scrapes each one, and ranks them by view count, taking the top N based on analysis depth. An optional Apify backend is preserved for production use (set `SCRAPER_BACKEND=apify`).
 
-**Stage 2 - Transcription:** Each reel's transcript is quality-gated. If Apify returned a usable transcript (30+ words), it's used directly. Otherwise, the video is downloaded, audio is extracted via ffmpeg, and Groq Whisper transcribes it. Reels with fewer than 20 words after all attempts are flagged as "visual-only" and skipped. Up to 5 transcriptions run concurrently.
+**Stage 2 - Transcription:** Each reel's transcript is quality-gated. If the scraper returned a usable transcript (30+ words), it's used directly. Otherwise, the audio is downloaded from the CDN URL, extracted via ffmpeg, and sent to Groq Whisper for transcription. Reels with fewer than 20 words after all attempts are flagged as "visual-only" and skipped. Up to 5 transcriptions run concurrently.
 
 **Stage 3 - Per-Reel Analysis:** Each transcript is sent to Claude Haiku 4.5 for structured extraction. The model returns a JSON object with 23 fields covering hooks, narrative structure, packaging framework, retention mechanics, vocabulary, emotion, CTAs, and transferable insights. Up to 10 analyses run concurrently.
 
 **Stage 4 - Cross-Reel Synthesis:** All successful per-reel analyses are batched into a single Claude Sonnet 4.5 call. This call is prefixed with the Theory System Prompt — a comprehensive Instagram growth theory framework — and produces the Formula Card by finding patterns across all analyzed reels and evaluating them against the theory.
 
 **Stage 5 - Formula Card:** The final output is a 13-section playbook ready for immediate use. Results are stored in-memory with a 30-minute TTL.
+
+### Script Lab Pipeline
+
+Script Lab skips scraping and transcription — users paste their own scripts directly:
+
+```
+1. ANALYZING       Claude Haiku extracts 23 structured fields per script
+         |
+2. AUDITING        Claude Sonnet evaluates all scripts against growth theory
+         |
+3. SCORECARDS      Per-script grades, issues, and refined openings
+         |
+4. REFINING        (Optional) On-demand Sonnet rewrite with humanizer toggle
+```
+
+**Stage 1 - Analysis:** Each script is sent to Claude Haiku for structured extraction, using an adapted prompt that doesn't expect video metadata. Produces the same 23-field `ReelAnalysis` schema as Reel Analysis.
+
+**Stage 2 - Audit:** All analyses plus the original script texts are sent to Claude Sonnet with the Theory System Prompt. Produces a `ScriptAuditResult` with per-script scorecards and cross-script patterns.
+
+**Stage 3 - Scorecards:** Each script gets an overall score (0-100), a verdict (Ready to Post / Needs Refinement / Rework Needed), and detailed grades for hook, structure, retention, authenticity, and algorithm alignment.
+
+**Stage 4 - Refinement:** After reviewing their scorecard, users can click "Refine This Script" to trigger an on-demand Sonnet rewrite that addresses all identified issues. See [Script Refiner](#script-refiner) below.
 
 ---
 
@@ -62,9 +93,10 @@ ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 | Frontend | React 18 + Tailwind CSS | Dark-themed analysis UI |
 | State/Polling | SWR | Real-time job progress polling (2s interval) |
 | Storage | In-memory Map (30-min TTL) | Job state; no database required |
-| Scraping | Apify (`apify/instagram-reel-scraper`) | Instagram metadata + transcript extraction |
-| Transcription | Groq Whisper Large V3 Turbo | Audio-to-text fallback (216x real-time) |
-| Audio Processing | ffmpeg | MP4-to-MP3 conversion |
+| Scraping | yt-dlp + Instagram GraphQL | Instagram metadata, video URLs, and insights (free) |
+| Scraping (production) | Apify (`apify/instagram-reel-scraper`) | Optional paid backend for production scale |
+| Transcription | Groq Whisper Large V3 Turbo | Audio-to-text transcription (216x real-time) |
+| Audio Processing | ffmpeg | Audio extraction from video |
 | Per-Reel AI | Claude Haiku 4.5 | Structured JSON extraction from transcripts |
 | Synthesis AI | Claude Sonnet 4.5 | Theory-grounded cross-reel pattern synthesis |
 
@@ -75,8 +107,11 @@ ReelsIQ processes Instagram Reels through a five-stage AI pipeline:
 ### Prerequisites
 
 - **Node.js** 18+
+- **yt-dlp** installed and available on PATH (required for Instagram scraping)
 - **ffmpeg** installed and available on PATH (required for audio extraction)
-- API keys for Apify, Groq, and Anthropic
+- **Python** 3.x (used by yt-dlp and for cookie extraction)
+- **Firefox** with a logged-in Instagram account (for cookie-based authentication)
+- API keys for Groq and Anthropic
 
 ### Installation
 
@@ -86,12 +121,26 @@ cd reelsiq
 npm install
 ```
 
+### System Dependencies
+
+```bash
+# Verify yt-dlp
+yt-dlp --version
+
+# Verify ffmpeg
+ffmpeg -version
+
+# Install if missing:
+# macOS:   brew install yt-dlp ffmpeg
+# Windows: winget install yt-dlp.yt-dlp && winget install ffmpeg
+# Linux:   pip install yt-dlp && apt install ffmpeg
+```
+
 ### Environment Variables
 
 Create a `.env` file in the project root:
 
 ```env
-APIFY_API_TOKEN=apify_api_...         # Apify API token
 GROQ_API_KEY=gsk_...                   # Groq API key (for Whisper transcription)
 ANTHROPIC_API_KEY=sk-ant-api03-...     # Anthropic API key (for Claude)
 ```
@@ -99,16 +148,27 @@ ANTHROPIC_API_KEY=sk-ant-api03-...     # Anthropic API key (for Claude)
 Optional:
 
 ```env
+# Scraper configuration (yt-dlp is the default — no config needed)
+INSTAGRAM_COOKIES_BROWSER=firefox      # Browser to read Instagram cookies from (default: firefox)
+# INSTAGRAM_COOKIES_FILE=              # Path to Netscape cookies.txt file (overrides browser)
+# YTDLP_CONCURRENCY=3                 # Max concurrent yt-dlp calls (default: 3)
+# YTDLP_DELAY_MS=1000                 # Delay between requests in ms (default: 1000)
+
+# Production: switch to Apify for managed scraping
+# SCRAPER_BACKEND=apify               # Set to "apify" to use Apify instead of yt-dlp
+# APIFY_API_TOKEN=apify_api_...       # Required only when SCRAPER_BACKEND=apify
+
 REELSIQ_KILL_SWITCH=1                  # Set to "1" to block all new job submissions
 ```
 
-### Verify ffmpeg
+### Instagram Cookie Setup
 
-```bash
-ffmpeg -version
-```
+The yt-dlp scraper reads Instagram cookies from Firefox to authenticate with Instagram:
 
-If not installed, get it from [ffmpeg.org](https://ffmpeg.org/download.html) or via your package manager.
+1. Open Firefox and log into a **dedicated scraper Instagram account** (not your personal account)
+2. That's it — yt-dlp automatically reads the cookies from Firefox
+
+> **Tip:** Use a separate Instagram account for scraping to avoid any risk to your personal account. Keep Chrome for personal browsing, Firefox for the scraper account.
 
 ---
 
@@ -126,10 +186,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 On the home page, you'll see the input form with these fields:
 
-**Input Mode — URLs or Handles (at least one required):**
+**Input Mode (toggle between three modes):**
 
 - **Reel URLs**: Paste up to 30 Instagram Reel URLs (one per line, or comma-separated). Must match `instagram.com/reel/` or `instagram.com/p/` format. Duplicates are automatically removed.
 - **Handles**: Enter up to 3 Instagram handles (e.g., `@username`). The system will pull their recent reels and select the top-performing ones by view count.
+- **Script Lab**: Paste up to 10 of your own scripts (minimum 20 words each) to audit them against the growth theory framework. See [Script Lab](#script-lab).
 
 **Configuration:**
 
@@ -138,11 +199,11 @@ On the home page, you'll see the input form with these fields:
   - Grow following
   - Generate leads
   - Build brand awareness
-- **Depth**: Choose analysis depth:
+- **Depth** (Reel URLs/Handles only): Choose analysis depth:
   - **Quick** — Analyzes up to 10 reels. Faster and cheaper.
   - **Deep** — Analyzes up to 25 reels. More data points for stronger pattern detection.
 
-Click **Analyze** to submit. You'll be redirected to the results page immediately.
+Click **Analyze Reels** or **Audit Scripts** to submit. You'll be redirected to the results page immediately.
 
 ### Viewing Results
 
@@ -269,6 +330,93 @@ A structured action plan for implementing the Formula Card findings:
 
 ---
 
+## Script Lab
+
+Script Lab is the second mode of ReelsIQ. Instead of analyzing existing Instagram Reels, you paste your own scripts and get them evaluated against the same growth theory framework.
+
+### Script Audit
+
+Each submitted script is analyzed and scored across five weighted areas:
+
+| Area | Weight | What it measures |
+|------|--------|------------------|
+| Hook | 25% | Clarity, curiosity gap, Two-Step Test pass/fail |
+| Structure | 20% | Narrative flow, detected framework, organizational effectiveness |
+| Retention | 25% | Payoff positioning, rhetorical interrupt density, curiosity maintenance |
+| Authenticity | 20% | Trust Recession alignment, AI detection risk, flagged phrases |
+| Algorithm Alignment | 10% | Session time signals, engagement fit, distribution potential |
+
+**Scoring:** Grades (strong = 1.0, moderate = 0.6, weak = 0.2) are combined with weights to produce a 0-100 overall score.
+
+**Verdicts:**
+- **75+** = Ready to Post
+- **50-74** = Needs Refinement
+- **< 50** = Rework Needed
+
+**Per-script output includes:**
+- Overall score with animated score ring
+- Verdict badge
+- Detailed assessment per area with grade, feedback, and specific metrics
+- AI detection risk level (low/medium/high) with flagged phrases highlighted
+- Algorithm alignment signals (aligned/partially aligned/misaligned)
+- Prioritized issues list with severity (critical/moderate/minor) and fix suggestions
+- A refined opening based on winning hook patterns
+- Cross-script patterns across all submitted scripts
+
+### Script Refiner
+
+After reviewing a scorecard, click **"Refine This Script"** on any individual script to trigger an on-demand Claude Sonnet rewrite.
+
+The refiner is **adaptive** — it automatically picks the right strategy based on the script's score and AI detection level:
+
+| Score | AI Detection Risk | Strategy | What it does |
+|-------|-------------------|----------|-------------|
+| 85+ | Any | Convergence | Minor polish only. Sharpens a word, tightens a sentence. 90%+ of text unchanged. |
+| < 85 | Medium or High | Humanization | Full structural improvement + replaces AI-sounding language with natural, conversational phrasing. |
+| < 85 | Low | Targeted Edit | Structural improvements only. Keeps the creator's voice, words, and tone intact. |
+
+**Refined output includes:**
+- Full rewritten script with copy-to-clipboard
+- Score improvement banner (original score, refined score, delta)
+- Hook before/after comparison (side-by-side)
+- Detailed changelog — every change listed with the specific growth-theory reasoning
+- Summary of what was improved and why
+
+Refined scripts are cached server-side so subsequent requests return instantly.
+
+### Humanizer Toggle
+
+A three-option toggle appears above the "Refine This Script" button, letting users control how much of their original text gets rewritten:
+
+| Mode | Label | When to use | Behavior |
+|------|-------|-------------|----------|
+| **Auto** | Auto-detect | Default — let the system decide | Uses the AI detection risk from the scorecard. Medium/high risk triggers humanization; low risk triggers structure-only. |
+| **On** | Humanize language | AI-generated scripts, ChatGPT output | Full rewrite — replaces formal/corporate language with casual, conversational phrasing throughout the entire script. |
+| **Off** | Keep my voice | Scripts you wrote yourself | Structure-only — rearranges for better hooks and payoff delay but keeps 90%+ of the creator's original words. |
+
+Different humanizer modes are cached separately, so users can try multiple modes on the same script without re-running the analysis.
+
+### Social Media Lexicon
+
+All three humanizer modes enforce a **banned words list** that prevents Claude from introducing AI-sounding language in its own output. This is always active — it constrains the AI's writing, not the creator's input.
+
+**Banned words** (Claude will never use these in refined output):
+- Corporate vocabulary: leverage, utilize, delve, facilitate, encompass, robust, streamline, optimize, synergy, pivotal, holistic, elevate, empower, paradigm, innovative, cutting-edge, transformative, harness, navigate, landscape, ecosystem, unlock, amplify
+- Formal transitions: furthermore, moreover, additionally, consequently, nevertheless, in addition, as a result, it is worth noting
+- Filler phrases: it's important to note, in today's landscape, at the end of the day, the reality is that, when it comes to, needless to say
+
+**Writing rules enforced:**
+- Always use contractions (don't, won't, here's)
+- Fragment sentences encouraged ("Dead serious." "Game changer.")
+- Start sentences with "And," "But," "So," "Look"
+- One idea per sentence — short and punchy
+- No semicolons in social media scripts
+- Write like talking to a friend, not presenting at a conference
+
+When humanization mode is active (toggle = "On" or auto-detected), additional rules rewrite the entire script: replacing formal language with casual equivalents, adding casual connectors ("here's the thing," "but wait"), using rhetorical questions to break up monologues, and preferring specific numbers over vague claims.
+
+---
+
 ## The Theory Engine
 
 The synthesis stage uses a comprehensive Instagram Growth Theory framework as its system prompt. This is not generic AI analysis — every pattern is evaluated against proven growth mechanics:
@@ -388,6 +536,53 @@ When `status` is `complete`, `result` contains:
 
 ---
 
+### POST `/api/jobs/[jobId]/refine` — Refine a Script
+
+Triggers an on-demand Claude Sonnet rewrite for a single script from a completed Script Lab job.
+
+**Request Body:**
+
+```json
+{
+  "scriptIndex": 0,
+  "humanize": "auto"
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `scriptIndex` | number | Yes | Index of the script to refine (0-based) |
+| `humanize` | string | No | `"auto"` (default), `"on"`, or `"off"`. Controls rewriting intensity. |
+
+**Response (200):**
+
+```json
+{
+  "refined": {
+    "refinedContent": "the enhanced script...",
+    "changes": [
+      { "area": "hook", "what": "rewrote opening", "why": "Two-Step Test failure" }
+    ],
+    "estimatedScoreAfter": 78,
+    "hookComparison": {
+      "before": "original hook text",
+      "after": "refined hook text"
+    },
+    "summaryOfChanges": "Improved hook clarity and..."
+  },
+  "cached": false
+}
+```
+
+**Errors:**
+- `400` — Invalid script index, job not a script job, or job not complete
+- `404` — Job not found or expired
+- `500` — Refinement failed (AI error or JSON parse failure)
+
+Results are cached by `scriptIndex + humanize` mode. Subsequent requests with the same parameters return `cached: true`.
+
+---
+
 ### POST `/api/jobs/[jobId]/export` — Export Formula Card
 
 **Query Parameters:**
@@ -406,10 +601,10 @@ When `status` is `complete`, `result` contains:
 Four test scripts are available for validating individual pipeline stages:
 
 ```bash
-# Test Apify scraping (uses 3 default reels)
-npm run test:apify
+# Test Instagram scraping via yt-dlp + GraphQL enrichment (3 default reels)
+npm run test:scraper
 
-# Test transcript extraction (scrape + transcribe 5 reels)
+# Test transcript extraction (scrape + transcribe a reel)
 npm run test:transcribe
 
 # Test per-reel analysis (scrape + transcribe + analyze)
@@ -419,7 +614,7 @@ npm run test:analyze [url1] [url2] ...
 npm run test:synthesize [url1] [url2] ...
 ```
 
-These scripts run outside the web app and output results directly to the console. They require the same environment variables as the main application.
+These scripts run outside the web app and output results directly to the console. They require yt-dlp + ffmpeg installed, Firefox with Instagram cookies, and the API keys in `.env`.
 
 ---
 
@@ -434,18 +629,25 @@ src/
 │   │   ├── route.ts                    # POST - create analysis job
 │   │   └── [jobId]/
 │   │       ├── status/route.ts         # GET - poll job progress
-│   │       └── export/route.ts         # POST - export results
+│   │       ├── export/route.ts         # POST - export results
+│   │       └── refine/route.ts         # POST - refine a script (Script Lab)
 │   ├── analysis/[jobId]/page.tsx       # Results page with progress + Formula Card
 │   ├── guide/page.tsx                  # Educational guide + glossary
 │   ├── layout.tsx                      # Root layout (dark theme)
 │   ├── page.tsx                        # Home page (input form)
 │   └── globals.css                     # Tailwind + custom styles
 ├── components/
-│   ├── InputForm.tsx                   # URL/handle input, niche/goal/depth config
+│   ├── InputForm.tsx                   # URL/handle/script input, niche/goal/depth config
 │   ├── ProgressIndicator.tsx           # Pipeline stage progress display
 │   ├── GuidedTour.tsx                  # Interactive Formula Card tour
 │   ├── InfoTip.tsx                     # Glossary term tooltip
 │   ├── ConfidenceBadge.tsx             # High/medium/low confidence badge
+│   ├── ScriptAudit/
+│   │   ├── ScriptAuditView.tsx        # Script Lab results container
+│   │   ├── ScriptScorecardCard.tsx    # Per-script scorecard with humanizer toggle
+│   │   ├── RefinedScriptView.tsx      # Refined script display (score delta, hook comparison, changelog)
+│   │   ├── VerdictBadge.tsx           # Ready to Post / Needs Refinement / Rework Needed
+│   │   └── GradeBadge.tsx             # Strong / Moderate / Weak assessment badge
 │   └── FormulaCard/
 │       ├── FormulaCard.tsx             # Master container (renders 13 sections)
 │       ├── AlgorithmAlignment.tsx      # Section 1: Algorithm alignment score
@@ -466,17 +668,28 @@ src/
 │   ├── job-processor.ts               # Five-stage pipeline orchestrator
 │   ├── validators.ts                   # Input validation (URLs, handles, niche, goal)
 │   ├── rate-limit.ts                   # IP-based rate limiting + kill switch
-│   ├── apify.ts                        # Apify scraper integration
+│   ├── scraper/
+│   │   ├── index.ts                   # Scraper dispatcher (yt-dlp default, Apify optional)
+│   │   ├── types.ts                   # ScrapedReel interface shared by all backends
+│   │   ├── ytdlp.ts                   # Free yt-dlp + GraphQL insights backend
+│   │   └── apify.ts                   # Paid Apify backend (for production)
 │   ├── transcribe.ts                   # Transcript quality gate + Groq Whisper
 │   ├── analyze.ts                      # Per-reel Claude Haiku extraction
 │   ├── synthesize.ts                   # Cross-reel Claude Sonnet synthesis
+│   ├── analyze-script.ts               # Per-script Haiku extraction (Script Lab)
+│   ├── audit.ts                        # Script audit Sonnet synthesis (scorecards)
+│   ├── script-processor.ts             # Script Lab pipeline orchestrator
+│   ├── refine-script.ts                # On-demand Sonnet script rewriter (Tier 2)
+│   ├── social-lexicon.ts               # Banned words list + humanizer guidance
+│   ├── scoring.ts                      # Deterministic 0-100 score from area grades
 │   ├── theory-prompt.ts                # Instagram Growth Theory system prompt
 │   ├── glossary.ts                     # Searchable glossary entries
 │   └── parse-json.ts                   # Robust JSON parsing (fences, regex fallback)
 ├── types/
-│   └── formula-card.ts                 # TypeScript interfaces for Formula Card
+│   ├── formula-card.ts                 # TypeScript interfaces for Formula Card
+│   └── script-audit.ts                 # TypeScript interfaces for Script Lab + Refiner
 scripts/
-├── test-apify.ts                       # Test Apify integration
+├── test-scraper.ts                     # Test yt-dlp + GraphQL scraping
 ├── test-transcribe.ts                  # Test transcription pipeline
 ├── test-analyze.ts                     # Test per-reel analysis
 └── test-synthesize.ts                  # Test full pipeline
@@ -487,15 +700,26 @@ docs/
 
 ### Processing Pipeline Concurrency
 
+**Reel Analysis:**
+
 | Stage | Concurrency | Service |
 |-------|-------------|---------|
-| Scraping | 1 (single batch call) | Apify |
+| Scraping | 3 concurrent | yt-dlp + Instagram GraphQL |
 | Transcribing | 5 concurrent | Groq Whisper |
 | Analyzing | 10 concurrent | Claude Haiku 4.5 |
 | Synthesizing | 1 (single call) | Claude Sonnet 4.5 |
 
+**Script Lab:**
+
+| Stage | Concurrency | Service |
+|-------|-------------|---------|
+| Analyzing | 10 concurrent | Claude Haiku 4.5 |
+| Auditing | 1 (single call) | Claude Sonnet 4.5 |
+| Refining | 1 (on-demand, per-script) | Claude Sonnet 4.5 |
+
 ### Data Flow
 
+**Reel Analysis:**
 ```
 User Input (URLs/handles + niche + goal + depth)
     │
@@ -503,7 +727,7 @@ User Input (URLs/handles + niche + goal + depth)
 Job Store (in-memory, 30-min TTL)
     │
     ▼
-Job Processor ─── Stage 1: Apify ──────────────────── ApifyReelResult[]
+Job Processor ─── Stage 1: yt-dlp + GraphQL ────────── ScrapedReel[]
     │                                                        │
     │              Stage 2: Groq Whisper ◄───────────────────┘
     │                  │                              TranscriptResult[]
@@ -515,6 +739,28 @@ Job Processor ─── Stage 1: Apify ─────────────�
     │                  │                              FormulaCard
     │                  ▼
     └──────────── Complete ──► Results Page + Export
+```
+
+**Script Lab:**
+```
+User Input (scripts + niche + goal)
+    │
+    ▼
+Job Store (in-memory, 30-min TTL)
+    │
+    ▼
+Script Processor ─── Stage 1: Claude Haiku ──────────── ReelAnalysis[]
+    │                                                        │
+    │                 Stage 2: Claude Sonnet ◄───────────────┘
+    │                     │                        ScriptAuditResult
+    │                     ▼                        (scorecards + patterns)
+    └──────────── Complete ──► Scorecards + Refine Button
+                                    │
+                                    ▼ (on-demand, per-script)
+                              Sonnet Refiner + Social Media Lexicon
+                                    │          + Humanizer Toggle
+                                    ▼
+                              RefinedScript (cached)
 ```
 
 ### State Management
@@ -536,7 +782,7 @@ Job Processor ─── Stage 1: Apify ─────────────�
 }
 ```
 
-The `apify-client` package must be externalized from the Next.js server bundle for compatibility.
+The `apify-client` package is externalized from the Next.js server bundle for compatibility (only loaded when using the Apify backend).
 
 ### Rate Limiting
 
@@ -558,25 +804,27 @@ The `apify-client` package must be externalized from the Next.js server bundle f
 
 ## Cost Estimates
 
-Approximate cost per analysis run:
+Approximate cost per analysis run (using yt-dlp default backend):
 
 | Depth | Reels | Estimated Cost |
 |-------|-------|---------------|
-| Quick | ~10 | ~$0.11 |
-| Deep | ~25 | ~$0.18 |
-| Max | 30 | ~$0.19 |
+| Quick | ~10 | ~$0.08 |
+| Deep | ~25 | ~$0.15 |
+| Max | 30 | ~$0.17 |
 
 Cost breakdown by service:
-- **Apify**: ~$0.0026 per reel scraped
-- **Groq Whisper**: ~$0.04 per hour of audio (only used when Apify transcript is insufficient)
+- **yt-dlp + GraphQL**: Free (default scraping backend)
+- **Groq Whisper**: ~$0.04 per hour of audio (free tier available)
 - **Claude Haiku 4.5**: Low cost per reel analysis
 - **Claude Sonnet 4.5**: Single synthesis call per job
+- **Apify** (optional production backend): ~$0.0026 per reel scraped
 
 ---
 
 ## Deployment Notes
 
-- **ffmpeg is required** on the server. Serverless platforms like Vercel Edge do not include it — use a serverful environment (e.g., Vercel Functions with Node.js runtime, Railway, Fly.io, or a VPS).
+- **yt-dlp and ffmpeg are required** on the server. Serverless platforms like Vercel Edge do not include them — use a serverful environment (e.g., Railway, Fly.io, or a VPS).
+- **Firefox with Instagram cookies** is required on the scraping machine for the yt-dlp backend. For production, switch to `SCRAPER_BACKEND=apify` which handles authentication via managed account pools.
 - **No database required** — jobs are stored in-memory. For production scale, swap the job store for Redis or a database.
-- **Apify actor timeout** is set to 300 seconds (5 minutes).
 - Environment variables must be available at runtime (not just build time).
+- Keep yt-dlp updated (`yt-dlp -U`) as Instagram frequently changes their frontend.

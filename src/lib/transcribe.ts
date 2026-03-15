@@ -6,19 +6,19 @@ import { join } from "path";
 import { pipeline } from "stream/promises";
 import { Readable } from "stream";
 import Groq from "groq-sdk";
-import type { ApifyReelResult } from "./apify";
+import type { ScrapedReel } from "./scraper";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface TranscriptResult {
-  /** Final transcript text (may come from Apify or Groq Whisper) */
+  /** Final transcript text (may come from scraper or Groq Whisper) */
   transcript: string | null;
   /** Word count of the final transcript */
   wordCount: number;
   /** Where the transcript came from */
-  source: "apify" | "whisper" | "none";
+  source: "scraper" | "whisper" | "none";
   /** True if the reel was flagged as visual-only (<20 words after all attempts) */
   visualOnly: boolean;
 }
@@ -116,22 +116,22 @@ async function whisperTranscribe(audioPath: string): Promise<string> {
 /**
  * Runs the transcript quality gate for a single reel:
  *
- * 1. If Apify transcript has >= 30 words -> pass through
+ * 1. If scraped transcript has >= 30 words -> pass through
  * 2. If missing/short -> download video, extract audio with ffmpeg, send to Groq Whisper
  * 3. If still < 20 words after Whisper -> flag as "visual-only"
  */
 export async function ensureTranscript(
-  reel: ApifyReelResult
+  reel: ScrapedReel
 ): Promise<TranscriptResult> {
-  // Gate 1: Apify transcript is sufficient
+  // Gate 1: Scraped transcript is sufficient
   if (reel.hasUsableTranscript && reel.transcript) {
     console.log(
-      `[transcribe] Apify transcript OK for ${reel.url} (${reel.transcriptWordCount} words)`
+      `[transcribe] Scraped transcript OK for ${reel.url} (${reel.transcriptWordCount} words)`
     );
     return {
       transcript: reel.transcript,
       wordCount: reel.transcriptWordCount,
-      source: "apify",
+      source: "scraper",
       visualOnly: false,
     };
   }
@@ -150,7 +150,7 @@ export async function ensureTranscript(
   }
 
   console.log(
-    `[transcribe] Apify transcript insufficient for ${reel.url} (${reel.transcriptWordCount} words) — falling back to Whisper`
+    `[transcribe] Scraped transcript insufficient for ${reel.url} (${reel.transcriptWordCount} words) — falling back to Whisper`
   );
 
   const tempDir = await mkdtemp(join(tmpdir(), "reelsiq-"));
@@ -171,10 +171,23 @@ export async function ensureTranscript(
     let whisperText: string;
     try {
       whisperText = await whisperTranscribe(audioPath);
-    } catch (err) {
+    } catch {
       // Retry once on failure (per spec Section 11)
       console.log(`[transcribe] Whisper failed, retrying once...`);
-      whisperText = await whisperTranscribe(audioPath);
+      try {
+        whisperText = await whisperTranscribe(audioPath);
+      } catch (retryErr) {
+        // If retry also fails, return gracefully instead of crashing
+        console.error(
+          `[transcribe] Whisper failed after retry for ${reel.url}: ${(retryErr as Error).message}`
+        );
+        return {
+          transcript: null,
+          wordCount: 0,
+          source: "none" as const,
+          visualOnly: true,
+        };
+      }
     }
 
     const wc = countWords(whisperText);
@@ -213,7 +226,7 @@ export async function ensureTranscript(
  * Runs up to `concurrency` reels in parallel (default 5 per spec).
  */
 export async function ensureTranscripts(
-  reels: ApifyReelResult[],
+  reels: ScrapedReel[],
   concurrency = 5
 ): Promise<TranscriptResult[]> {
   const results: TranscriptResult[] = new Array(reels.length);
@@ -222,7 +235,19 @@ export async function ensureTranscripts(
   async function worker() {
     while (idx < reels.length) {
       const i = idx++;
-      results[i] = await ensureTranscript(reels[i]);
+      try {
+        results[i] = await ensureTranscript(reels[i]);
+      } catch (err) {
+        console.error(
+          `[transcribe] Unexpected error for ${reels[i].url}: ${(err as Error).message}`
+        );
+        results[i] = {
+          transcript: null,
+          wordCount: 0,
+          source: "none",
+          visualOnly: true,
+        };
+      }
     }
   }
 
